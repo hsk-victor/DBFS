@@ -42,7 +42,7 @@ Open <http://127.0.0.1:5173>. Vite forwards `/api` requests to Flask at
 - PayPal login and the user session are shared across all pages.
 - Each feature keeps its own checkout logic inside its member backend folder.
 - All modules use the same Supabase project through `backend/shared/database.py`.
-- Each member uses their own `.env` and credentials when presenting locally.
+- Each member uses their own `.env` when presenting.
 
 ## Implementing your frontend
 
@@ -58,26 +58,6 @@ const data = await api.get("/api/crypto/example");
 await api.post("/api/crypto/example", { value });
 ```
 
-- API keys and service secrets stay in the backend `.env`, not React files.
-
-## Implementing your backend
-
-- Add routes inside your member folder and keep them under your existing prefix.
-- The current member `__init__.py` shows how the Flask blueprint is registered.
-- Larger features can be separated into `routes/` and `services/`, similar to
-  `backend/victor`.
-- Authenticated endpoints can use:
-
-```python
-from backend.shared.auth import require_user
-
-user, error = require_user()
-if error:
-    return error
-```
-
-- External API calls and calculations fit better in a service file, leaving the
-  route responsible for validation and returning JSON.
 
 ## PayPal and Supabase
 
@@ -96,21 +76,3 @@ from backend.shared.database import supabase
 - New tables should use clear feature names such as `crypto_watchlist`.
 - New database changes go into a new timestamped file under
   `supabase/migrations`.
-
-## Adding configuration
-
-- Add the variable name with an empty value to `.env.example`.
-- Load it once in `backend/config.py`.
-- Use the `Config` value inside your backend service.
-- Restart Flask after changing `.env`.
-- `.env`, logs, `node_modules`, build output and Python caches are already ignored
-  by Git.
-
-## Quick check before sharing
-
-- Your page opens from the shared navigation.
-- Your Flask endpoint returns JSON and handles missing input clearly.
-- Login/logout and the other two pages still work.
-- Supabase data is separated by the authenticated user.
-- Checkout success and cancellation return to the correct page.
-- `npm run build` passes.
