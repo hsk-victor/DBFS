@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #fafafa;
+  color: #18181b;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #e4e4e7;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes dlg-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes soft-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.anim-fade { animation: fade-in 0.2s ease; }
+.anim-dlg { animation: dlg-in 0.18s ease; }
+.anim-pulse { animation: soft-pulse 1.2s ease infinite; }
+
+/* dotted infinite-canvas background */
+.canvas-grid {
+  background-image: radial-gradient(#e4e4e7 1px, transparent 1px);
+}
