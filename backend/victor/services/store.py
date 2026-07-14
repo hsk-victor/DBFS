@@ -156,13 +156,6 @@ class Store:
             self._save_local()
         return holdings
 
-    def seed_holdings_if_new(self, user_id: str):
-        """First login gets a small starter portfolio so the dashboard isn't empty."""
-        if self.get_holdings(user_id):
-            return
-        for sym, qty, avg in [("NVDA", 12, 150.10), ("GOOG", 8, 176.20), ("MSFT", 4, 480.00)]:
-            self.apply_fill(user_id, sym, "buy", qty, avg)
-
     # ---------- orders ----------
     def get_orders(self, user_id: str) -> list:
         if self._sb:

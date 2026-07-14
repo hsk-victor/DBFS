@@ -21,7 +21,6 @@ def holdings():
     user, err = require_user()
     if err:
         return err
-    store.seed_holdings_if_new(user["user_id"])
     h = store.get_holdings(user["user_id"])
     fx, _ = frankfurter.usd_sgd()
     out = []
