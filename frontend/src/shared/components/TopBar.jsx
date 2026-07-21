@@ -6,7 +6,7 @@ import { fmtPct, fmtUsd } from "@/shared/lib/format";
 const SECTIONS = [
     { label: "Stocks", note: "Victor" },
     { label: "Crypto", note: "Zavier" },
-    { label: "Other", note: "Ong Xuan" },
+    { label: "Forex", note: "Ong Xuan" },
 ];
 function StatusPill({ loading, dataState }) {
     if (!loading && dataState !== "demo")
