@@ -7,6 +7,7 @@ export const cryptoApi = {
     chart: () => api.get("/api/crypto/chart"),
     news: (symbol) => api.get(`/api/crypto/news?symbol=${symbol}`),
     fx: () => api.get("/api/crypto/fx"),
+    holdings: () => api.get("/api/crypto/holdings"),
     order: (body) => api.post("/api/crypto/orders", body),
     orderStatus: (orderId) => api.get(`/api/crypto/orders/${orderId}`),
 };

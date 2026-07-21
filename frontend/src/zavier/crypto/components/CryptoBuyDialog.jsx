@@ -26,6 +26,9 @@ function Seg({ value, options, onChange }) {
 }
 
 export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
+    const side = coin?.side === "sell" ? "sell" : "buy";
+    const isSell = side === "sell";
+    const maxQty = Number(coin?.maxQty ?? 0);
     const [mode, setMode] = useState("shares");
     const [qty, setQty] = useState(1);
     const [cash, setCash] = useState("500");
@@ -35,7 +38,8 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
     const price = Number(quote?.price ?? 0);
     const changePct = Number(quote?.change_pct ?? 0);
     const cashVal = Math.max(0, Number.parseFloat(cash) || 0);
-    const estQty = useMemo(() => (mode === "cash" && price > 0 ? cashVal / fxRate / price : qty), [mode, cashVal, fxRate, price, qty]);
+    const effectiveMode = isSell ? "shares" : mode;
+    const estQty = useMemo(() => (effectiveMode === "cash" && price > 0 ? cashVal / fxRate / price : qty), [effectiveMode, cashVal, fxRate, price, qty]);
     const usd = estQty * price;
     const sgd = usd * fxRate;
 
@@ -47,9 +51,9 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
         try {
             const payload = {
                 symbol: coin?.symbol,
-                side: "buy",
+                side,
                 order_type: "market",
-                mode,
+                mode: effectiveMode,
                 qty,
                 cash_sgd: cashVal,
                 price_usd: price,
@@ -77,8 +81,8 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
                         {coin?.symbol?.slice(0, 2) ?? "CR"}
                     </div>
                     <div>
-                        <div className="text-[15px] font-semibold">Buy {coin?.symbol ?? "Crypto"}</div>
-                        <div className="text-xs text-zinc-500">{coin?.name ?? coin?.symbol ?? "Asset"} · preview only</div>
+                        <div className="text-[15px] font-semibold">{isSell ? "Sell" : "Buy"} {coin?.symbol ?? "Crypto"}</div>
+                        <div className="text-xs text-zinc-500">{coin?.name ?? coin?.symbol ?? "Asset"} · {isSell ? "payout preview" : "preview only"}</div>
                     </div>
                 </div>
 
@@ -95,18 +99,32 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
                     ≈ {fmtUsd(price)} USD{quote?.source !== "live" ? " · cached" : ""}
                 </div>
 
-                <div className="mt-4 flex items-center justify-between">
-                    <div className="text-[13px] font-medium text-zinc-700">Buy in</div>
-                    <Seg value={mode} onChange={setMode} options={[{ id: "shares", label: "Shares" }, { id: "cash", label: "Cash" }]} />
-                </div>
+                {!isSell && (
+                    <div className="mt-4 flex items-center justify-between">
+                        <div className="text-[13px] font-medium text-zinc-700">Buy in</div>
+                        <Seg value={mode} onChange={setMode} options={[{ id: "shares", label: "Shares" }, { id: "cash", label: "Cash" }]} />
+                    </div>
+                )}
 
-                {mode === "shares" ? (
+                {isSell && (
+                    <div className="mt-4 rounded-[9px] border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11.5px] text-zinc-600">
+                        Available: {maxQty.toFixed(6)} {coin?.symbol ?? "units"}
+                    </div>
+                )}
+
+                {effectiveMode === "shares" ? (
                     <div className="mt-3 flex items-center justify-between">
                         <div className="text-[13px] font-medium text-zinc-700">Quantity</div>
-                        <div className="flex items-center gap-0.5 rounded-[9px] border border-zinc-200 p-0.5">
-                            <button onClick={() => setQty((current) => Math.max(1, current - 1))} className="h-7 w-[30px] cursor-pointer rounded-[7px] text-[15px] text-zinc-600 hover:bg-zinc-100">−</button>
-                            <div className="min-w-[34px] text-center font-mono text-sm font-semibold">{qty}</div>
-                            <button onClick={() => setQty((current) => current + 1)} className="h-7 w-[30px] cursor-pointer rounded-[7px] text-[15px] text-zinc-600 hover:bg-zinc-100">+</button>
+                        <div className="flex items-center gap-1.5 rounded-[9px] border border-zinc-200 px-2.5 py-[5px]">
+                            <span className="font-mono text-xs text-zinc-400">{coin?.symbol ?? "COIN"}</span>
+                            <input
+                                type="number"
+                                step="0.0001"
+                                min="0"
+                                value={qty}
+                                onChange={(event) => setQty(Math.max(0, Number.parseFloat(event.target.value) || 0))}
+                                className="w-24 border-none bg-transparent text-right font-mono text-[13.5px] font-semibold outline-none"
+                            />
                         </div>
                     </div>
                 ) : (
@@ -134,7 +152,7 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
                 <div className="mt-3.5 border-t border-zinc-100">
                     {[
                         ["Price", fmtUsd(price)],
-                        [mode === "cash" ? "Est. qty" : "Quantity", mode === "cash" ? estQty.toFixed(6) : String(qty)],
+                        [effectiveMode === "cash" ? "Est. qty" : "Quantity", effectiveMode === "cash" ? estQty.toFixed(6) : String(qty)],
                         ["Subtotal (USD)", fmtUsd(usd)],
                         ["FX", `1 USD = S$${fxRate.toFixed(4)}`],
                     ].map(([label, value]) => (
@@ -146,17 +164,17 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
                 </div>
 
                 <div className="mt-3.5 flex items-baseline justify-between">
-                    <div className="text-[13px] font-semibold">You pay</div>
+                    <div className="text-[13px] font-semibold">{isSell ? "You receive" : "You pay"}</div>
                     <div className="font-mono text-[22px] font-bold tracking-tight">S${sgd.toFixed(2)}</div>
                 </div>
                 <div className="mt-1 text-right text-[11px] text-zinc-400">
-                    Market buy routes through /api/crypto/orders.
+                    {isSell ? "Market sell routes through /api/crypto/orders and PayPal payouts." : "Market buy routes through /api/crypto/orders."}
                 </div>
 
                 {error && <div className="mt-2 text-center text-[11.5px] text-red-800">{error}</div>}
 
-                <Button onClick={submit} disabled={submitting || estQty <= 0} className="mt-4 w-full rounded-[10px] py-[11px] text-[13.5px]">
-                    {submitting ? "Processing..." : "Continue with PayPal"}
+                <Button onClick={submit} disabled={submitting || estQty <= 0 || (isSell && estQty > maxQty + 1e-9)} className="mt-4 w-full rounded-[10px] py-[11px] text-[13.5px]">
+                    {submitting ? "Processing..." : isSell ? "Sell with PayPal payout" : "Continue with PayPal"}
                 </Button>
                 <Button variant="ghost" onClick={onClose} className="mt-2 w-full rounded-[9px] py-2 font-medium">
                     Cancel

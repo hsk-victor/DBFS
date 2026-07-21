@@ -10,7 +10,7 @@ import { TABS } from "@/zavier/crypto/constants";
 import { useCryptoDetails } from "@/zavier/crypto/hooks/useCryptoDetails";
 import { mapSpark } from "@/zavier/crypto/lib/cryptoFormat";
 
-export function CryptoCard({ card, coin, quote, fxRate, zoom, loading, onFront, onPatch, onRemove, onBuy }) {
+export function CryptoCard({ card, coin, quote, fxRate, zoom, loading, onFront, onPatch, onRemove, onBuy, onSell }) {
     const symbol = card.sym;
     const tab = card.tab ?? "overview";
     const details = useCryptoDetails(symbol, coin, tab);
@@ -98,9 +98,14 @@ export function CryptoCard({ card, coin, quote, fxRate, zoom, loading, onFront, 
                 {details.error && <div className="px-4 pb-2 text-[11px] text-red-800">{details.error}</div>}
 
                 <div className="shrink-0 px-3.5 pb-3.5 pt-2.5" data-nodrag="1">
-                    <Button onClick={onBuy} className="w-full rounded-[9px] py-[9px] text-[13px]">
-                        Buy {symbol}
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={onBuy} className="w-1/2 rounded-[9px] py-[9px] text-[13px]">
+                            Buy {symbol}
+                        </Button>
+                        <Button onClick={onSell} variant="outline" className="w-1/2 rounded-[9px] py-[9px] text-[13px]">
+                            Sell {symbol}
+                        </Button>
+                    </div>
                 </div>
             </div>
         </CardFrame>

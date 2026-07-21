@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Canvas, loadView } from "@/victor/stocks/components/canvas/Canvas";
 import { CryptoCard } from "@/zavier/crypto/components/CryptoCard";
 import { CryptoBuyDialog } from "@/zavier/crypto/components/CryptoBuyDialog";
+import { CryptoPortfolioCard } from "@/zavier/crypto/components/CryptoPortfolioCard";
 import { CryptoOrderResultDialog } from "@/zavier/crypto/components/CryptoOrderResultDialog";
 import { COINS } from "@/zavier/crypto/constants";
 import { useCryptoDashboard } from "@/zavier/crypto/hooks/useCryptoDashboard";
@@ -10,12 +11,13 @@ import { cryptoApi } from "@/zavier/crypto/lib/cryptoApi";
 export function CryptoPage() {
     const dashboard = useCryptoDashboard();
     const [view, setView] = useState(loadView);
-    const [buyCoin, setBuyCoin] = useState(null);
+    const [tradeCoin, setTradeCoin] = useState(null);
     const [orderResult, setOrderResult] = useState(null);
     const [cards, setCards] = useState(() => [
         { sym: "BTC", x: 36, y: 36, w: 344, h: 400, z: 1, tab: "overview", big: false },
         { sym: "ETH", x: 412, y: 92, w: 344, h: 400, z: 2, tab: "overview", big: false },
         { sym: "XRP", x: 788, y: 36, w: 344, h: 400, z: 3, tab: "overview", big: false },
+        { sym: "__CPF", x: 36, y: 470, w: 400, h: 356, z: 5, tab: "overview", big: false },
     ]);
 
     const patchCard = (sym, patch) => {
@@ -81,40 +83,75 @@ export function CryptoPage() {
                     </div>
                 )}
 
-                {cards.map((card) => (
-                    <CryptoCard
-                        key={card.sym}
-                        card={card}
-                        coin={COINS.find((coin) => coin.symbol === card.sym)}
-                        quote={dashboard.priceLookup[card.sym]}
-                        fxRate={dashboard.fx.rate}
-                        zoom={view.zoom}
-                        loading={dashboard.loading}
-                        onFront={() => bringFront(card.sym)}
-                        onPatch={(patch) => patchCard(card.sym, patch)}
-                        onRemove={() => removeCard(card.sym)}
-                        onBuy={() => setBuyCoin({
-                            coin: COINS.find((item) => item.symbol === card.sym) ?? { symbol: card.sym, name: card.sym },
-                            quote: dashboard.priceLookup[card.sym] ?? null,
-                        })}
-                    />
-                ))}
+                {cards.map((card) => {
+                    if (card.sym === "__CPF") {
+                        return (
+                            <CryptoPortfolioCard
+                                key={card.sym}
+                                card={card}
+                                holdings={dashboard.holdings}
+                                fxRate={dashboard.fx.rate}
+                                zoom={view.zoom}
+                                loading={dashboard.loading}
+                                onFront={() => bringFront(card.sym)}
+                                onPatch={(patch) => patchCard(card.sym, patch)}
+                                onRemove={() => removeCard(card.sym)}
+                            />
+                        );
+                    }
+                    return (
+                        <CryptoCard
+                            key={card.sym}
+                            card={card}
+                            coin={COINS.find((coin) => coin.symbol === card.sym)}
+                            quote={dashboard.priceLookup[card.sym]}
+                            fxRate={dashboard.fx.rate}
+                            zoom={view.zoom}
+                            loading={dashboard.loading}
+                            onFront={() => bringFront(card.sym)}
+                            onPatch={(patch) => patchCard(card.sym, patch)}
+                            onRemove={() => removeCard(card.sym)}
+                            onBuy={() => setTradeCoin({
+                                coin: {
+                                    ...(COINS.find((item) => item.symbol === card.sym) ?? { symbol: card.sym, name: card.sym }),
+                                    side: "buy",
+                                },
+                                quote: dashboard.priceLookup[card.sym] ?? null,
+                            })}
+                            onSell={() => {
+                                const holding = (dashboard.holdings || []).find((row) => row.symbol === card.sym);
+                                setTradeCoin({
+                                    coin: {
+                                        ...(COINS.find((item) => item.symbol === card.sym) ?? { symbol: card.sym, name: card.sym }),
+                                        side: "sell",
+                                        maxQty: Number(holding?.qty ?? 0),
+                                    },
+                                    quote: dashboard.priceLookup[card.sym] ?? null,
+                                });
+                            }}
+                        />
+                    );
+                })}
             </Canvas>
 
-            {buyCoin && (
+            {tradeCoin && (
                 <CryptoBuyDialog
-                    coin={buyCoin.coin}
-                    quote={buyCoin.quote}
+                    coin={tradeCoin.coin}
+                    quote={tradeCoin.quote}
                     fxRate={dashboard.fx.rate}
-                    onClose={() => setBuyCoin(null)}
+                    onClose={() => setTradeCoin(null)}
                     onSuccess={(payload) => {
-                        setBuyCoin(null);
+                        setTradeCoin(null);
                         setOrderResult({ status: payload?.order?.status ?? "filled", order: payload?.order ?? null, paypal: payload?.paypal ?? null });
+                        dashboard.refresh();
                     }}
                 />
             )}
 
-            {orderResult && <CryptoOrderResultDialog result={orderResult} onClose={() => setOrderResult(null)} />}
+            {orderResult && <CryptoOrderResultDialog result={orderResult} onClose={() => {
+                setOrderResult(null);
+                dashboard.refresh();
+            }} />}
         </div>
     );
 }

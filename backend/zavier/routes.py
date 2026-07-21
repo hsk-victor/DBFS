@@ -11,7 +11,7 @@ from ..shared.database import supabase
 from .services.GNews import search_symbol_strict
 from .services.coingecko import fundamentals_all, market_chart_all
 from .services.eodhd import eod_series_all, realtime_prices, usd_sgd
-from .services.paypal import capture_order, create_order, userinfo_strict
+from .services.paypal import capture_order, create_order, create_payout, get_payout_batch, userinfo_strict
 
 crypto_bp = Blueprint("crypto", __name__)
 
@@ -47,6 +47,20 @@ def _find_order(user_id: str, order_id: str):
         .select("*")
         .eq("user_id", user_id)
         .eq("order_id", order_id)
+        .limit(1)
+        .execute()
+    )
+    return res.data[0] if res.data else None
+
+
+def _find_holding(user_id: str, symbol: str):
+    if not supabase:
+        raise RuntimeError("supabase is not configured")
+    res = (
+        supabase.table("holdings")
+        .select("qty,avg_price")
+        .eq("user_id", user_id)
+        .eq("symbol", symbol)
         .limit(1)
         .execute()
     )
@@ -89,14 +103,40 @@ def _apply_crypto_fill(user_id: str, symbol: str, shares: float, price_usd: floa
     }).execute()
 
 
+def _apply_crypto_sell(user_id: str, symbol: str, shares: float):
+    current = _find_holding(user_id, symbol)
+    if not current:
+        raise RuntimeError("holding not found")
+
+    old_qty = float(current.get("qty") or 0)
+    old_avg = float(current.get("avg_price") or 0)
+    if shares <= 0:
+        raise RuntimeError("sell shares must be positive")
+    if shares > old_qty + 1e-9:
+        raise RuntimeError("sell quantity exceeds holdings")
+
+    new_qty = old_qty - shares
+    if new_qty <= 1e-9:
+        # Schema enforces qty > 0, so fully liquidated holdings must be removed.
+        supabase.table("holdings").delete().eq("user_id", user_id).eq("symbol", symbol).execute()
+        return
+
+    supabase.table("holdings").upsert({
+        "user_id": user_id,
+        "symbol": symbol,
+        "qty": new_qty,
+        "avg_price": old_avg,
+    }).execute()
+
+
 def _parse_order_body(body: dict):
     symbol = str(body.get("symbol", "")).upper().strip()
     if symbol not in ALLOWED_CRYPTO:
         return None, "unknown crypto symbol"
 
     side = str(body.get("side", "buy")).lower().strip()
-    if side != "buy":
-        return None, "only buy is supported"
+    if side not in {"buy", "sell"}:
+        return None, "side must be buy or sell"
 
     order_type = str(body.get("order_type", "market")).lower().strip()
     if order_type not in {"market", "limit"}:
@@ -180,9 +220,18 @@ def create_crypto_order():
     if not normalized:
         return jsonify({"error": message}), 400
 
+    if normalized["side"] == "sell":
+        try:
+            h = _find_holding(user["user_id"], normalized["symbol"])
+        except Exception as exc:
+            return jsonify({"error": f"holding lookup failed: {exc}"}), 502
+        owned = float((h or {}).get("qty") or 0)
+        if normalized["shares"] > owned + 1e-9:
+            return jsonify({"error": f"cannot sell {normalized['shares']:.6f} {normalized['symbol']} (owned {owned:.6f})"}), 400
+
     order_id = "CRY-" + secrets.token_hex(4).upper()
     status = "working" if normalized["order_type"] == "limit" else "filled"
-    if normalized["order_type"] == "market" and not user.get("demo"):
+    if normalized["side"] == "buy" and normalized["order_type"] == "market" and not user.get("demo"):
         status = "pending_approval"
 
     record = {
@@ -202,6 +251,8 @@ def create_crypto_order():
     }
 
     approve_url = None
+    payout_batch_id = None
+    payout_status = None
     if status == "pending_approval":
         base = request.host_url.rstrip("/")
         try:
@@ -220,6 +271,35 @@ def create_crypto_order():
         record["order_id"] = created["id"]
         approve_url = created.get("approve_url")
 
+    if normalized["side"] == "sell" and normalized["order_type"] == "market" and not user.get("demo"):
+        payout_status = "failed"
+        try:
+            sender_batch_id = "CRY-SELL-" + secrets.token_hex(8).upper()
+            created = create_payout(
+                sender_batch_id=sender_batch_id,
+                receiver_email=str(user.get("email") or "").strip(),
+                amount_sgd=f"{normalized['sgd_total']:.2f}",
+                note=f"Sell {normalized['shares']:.6f} {normalized['symbol']} via sandbox payout",
+            )
+            payout_batch_id = created.get("batch_id")
+            payout_status = created.get("status") or "PENDING"
+            if payout_batch_id:
+                try:
+                    fetched = get_payout_batch(payout_batch_id)
+                    payout_status = (fetched.get("batch_header") or {}).get("batch_status", payout_status)
+                except Exception:
+                    pass
+            if payout_status in {"SUCCESS", "PENDING", "PROCESSING"}:
+                status = "filled"
+            else:
+                status = "failed"
+        except Exception as exc:
+            return jsonify({"error": f"paypal payout failed: {exc}"}), 502
+
+        if payout_batch_id:
+            record["order_id"] = payout_batch_id
+        record["status"] = status
+
     try:
         _insert_order(record)
     except Exception as exc:
@@ -227,11 +307,14 @@ def create_crypto_order():
 
     if record["status"] == "filled":
         try:
-            _apply_crypto_fill(user["user_id"], record["symbol"], float(record["shares"]), float(record["price_usd"]))
+            if record["side"] == "buy":
+                _apply_crypto_fill(user["user_id"], record["symbol"], float(record["shares"]), float(record["price_usd"]))
+            else:
+                _apply_crypto_sell(user["user_id"], record["symbol"], float(record["shares"]))
         except Exception as exc:
             return jsonify({"error": f"holdings update failed: {exc}"}), 502
 
-    return jsonify({"order": record, "approve_url": approve_url})
+    return jsonify({"order": record, "approve_url": approve_url, "payout_batch_id": payout_batch_id, "payout_status": payout_status})
 
 
 @crypto_bp.get("/orders/<order_id>")
@@ -249,6 +332,38 @@ def crypto_order_status(order_id):
         return jsonify({"error": "order not found"}), 404
 
     return jsonify({"order": row, "paypal": None})
+
+
+@crypto_bp.get("/holdings")
+def crypto_holdings():
+    user, err = _read_user()
+    if err:
+        return err
+    if not supabase:
+        return jsonify({"error": "supabase not configured"}), 503
+
+    try:
+        res = (
+            supabase.table("holdings")
+            .select("symbol,qty,avg_price")
+            .eq("user_id", user["user_id"])
+            .execute()
+        )
+    except Exception as exc:
+        return jsonify({"error": f"holdings lookup failed: {exc}"}), 502
+
+    rows = res.data or []
+    holdings = []
+    for row in rows:
+        symbol = str(row.get("symbol", "")).upper().strip()
+        if symbol not in ALLOWED_CRYPTO:
+            continue
+        holdings.append({
+            "symbol": symbol,
+            "qty": float(row.get("qty") or 0),
+            "avg_price": float(row.get("avg_price") or 0),
+        })
+    return jsonify({"holdings": holdings})
 
 
 @crypto_bp.get("/orders/paypal/return")

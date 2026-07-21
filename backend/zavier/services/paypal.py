@@ -118,6 +118,42 @@ def capture_order(order_id: str) -> dict:
 	return _paypal_request("POST", f"/v2/checkout/orders/{order_id}/capture", json_body={})
 
 
+def create_payout(*, sender_batch_id: str, receiver_email: str, amount_sgd: str, note: str) -> dict:
+	receiver = (receiver_email or "").strip()
+	if not receiver:
+		raise ValueError("missing payout receiver email")
+	payload = _paypal_request(
+		"POST",
+		"/v1/payments/payouts",
+		json_body={
+			"sender_batch_header": {
+				"sender_batch_id": sender_batch_id,
+				"email_subject": "You received a payout",
+				"email_message": note,
+			},
+			"items": [{
+				"recipient_type": "EMAIL",
+				"amount": {"value": amount_sgd, "currency": "SGD"},
+				"receiver": receiver,
+				"note": note,
+				"sender_item_id": sender_batch_id,
+			}],
+		},
+	)
+	return {
+		"batch_id": ((payload.get("batch_header") or {}).get("payout_batch_id", "")),
+		"status": ((payload.get("batch_header") or {}).get("batch_status", "")),
+		"raw": payload,
+	}
+
+
+def get_payout_batch(payout_batch_id: str) -> dict:
+	batch_id = (payout_batch_id or "").strip()
+	if not batch_id:
+		raise ValueError("missing payout batch id")
+	return _paypal_request("GET", f"/v1/payments/payouts/{batch_id}")
+
+
 def userinfo_strict(user_access_token: str) -> dict:
 	"""URI: GET /v1/identity/openidconnect/userinfo?schema=openid"""
 	token = (user_access_token or "").strip()
