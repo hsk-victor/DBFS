@@ -2,11 +2,14 @@
 
 Provides the DBFS Assignment 2 foreign-exchange feature:
 - retrieves live EUR/SGD, GBP/SGD and USD/SGD rates from Frankfurter API
+- compares rates with a second FX API provider
+- retrieves 7-day FX rate history
 - creates forex purchase quotes
 - simulates/creates PayPal Sandbox checkout orders for buy transactions
 """
 import secrets
 import time
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 import requests
@@ -38,8 +41,10 @@ def _as_decimal(value, field: str) -> Decimal:
         d = Decimal(str(value))
     except (InvalidOperation, ValueError):
         raise ValueError(f"{field} must be a number")
+
     if d <= 0:
         raise ValueError(f"{field} must be positive")
+
     return d
 
 
@@ -58,6 +63,7 @@ def _live_rates():
     data = response.json()
 
     rates = {}
+
     for code in SUPPORTED:
         raw = Decimal(str(data["rates"][code]))
         rates[code] = _rate(Decimal("1") / raw)
@@ -79,6 +85,75 @@ def get_rates():
             "date": "",
             "source": "Fixed fallback rates",
             "demo": True,
+        }
+
+
+def get_backup_rates():
+    """Return SGD cost for 1 unit of each foreign currency from a second FX provider.
+
+    This uses open.er-api.com as a backup provider. It returns how much foreign
+    currency 1 SGD buys, so we invert it to show 1 USD/EUR/GBP = X SGD.
+    """
+    try:
+        response = requests.get(
+            "https://open.er-api.com/v6/latest/SGD",
+            timeout=12,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        rates = {}
+
+        for code in SUPPORTED:
+            raw = Decimal(str(data["rates"][code]))
+            rates[code] = _rate(Decimal("1") / raw)
+
+        return {
+            "rates": rates,
+            "source": "Open Exchange Rate API",
+            "demo": False,
+        }
+    except Exception:
+        return {
+            "rates": {code: cfg["fallback"] for code, cfg in SUPPORTED.items()},
+            "source": "Fixed fallback rates",
+            "demo": True,
+        }
+
+
+def get_rate_history():
+    """Return 7-day FX rate history using Frankfurter API."""
+    try:
+        end_date = date.today()
+        start_date = end_date - timedelta(days=7)
+
+        response = requests.get(
+            f"https://api.frankfurter.dev/v1/{start_date}..{end_date}",
+            params={"base": "SGD", "symbols": "USD,EUR,GBP"},
+            timeout=12,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        history = []
+
+        for d, values in data.get("rates", {}).items():
+            item = {"date": d}
+
+            for code in SUPPORTED:
+                raw = Decimal(str(values[code]))
+                item[code] = float(_rate(Decimal("1") / raw))
+
+            history.append(item)
+
+        return {
+            "source": "Frankfurter API",
+            "history": history,
+        }
+    except Exception:
+        return {
+            "source": "No history available",
+            "history": [],
         }
 
 
@@ -113,6 +188,40 @@ def health():
 @forex_bp.get("/rates")
 def rates():
     return jsonify(_format_rates(get_rates()))
+
+
+@forex_bp.get("/rate-comparison")
+def rate_comparison():
+    primary = get_rates()
+    backup = get_backup_rates()
+
+    comparison = []
+
+    for code in ("USD", "EUR", "GBP"):
+        primary_rate = primary["rates"][code]
+        backup_rate = backup["rates"][code]
+        difference = _rate(primary_rate - backup_rate)
+
+        comparison.append({
+            "code": code,
+            "pair": f"{code}/SGD",
+            "primary_rate": float(primary_rate),
+            "primary_source": primary["source"],
+            "backup_rate": float(backup_rate),
+            "backup_source": backup["source"],
+            "difference": float(difference),
+        })
+
+    return jsonify({
+        "comparison": comparison,
+        "primary_source": primary["source"],
+        "backup_source": backup["source"],
+    })
+
+
+@forex_bp.get("/history")
+def rate_history():
+    return jsonify(get_rate_history())
 
 
 @forex_bp.post("/quote")

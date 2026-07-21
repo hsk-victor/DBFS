@@ -47,11 +47,11 @@ function StatusBanner({ status, orderId, onDismiss }) {
             "×",
         ],
     }[status] ?? [
-            "Purchase update",
-            "Your order status has been updated.",
-            "bg-zinc-50 border-zinc-200 text-zinc-700",
-            "i",
-        ];
+        "Purchase update",
+        "Your order status has been updated.",
+        "bg-zinc-50 border-zinc-200 text-zinc-700",
+        "i",
+    ];
 
     return (
         <div className={`mb-4 flex items-start gap-3 rounded-2xl border p-4 ${config[2]}`}>
@@ -77,9 +77,119 @@ function StatusBanner({ status, orderId, onDismiss }) {
     );
 }
 
+function MiniTrendChart({ history, currency }) {
+    const points = history?.history ?? [];
+
+    if (!points.length) {
+        return (
+            <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 p-5 text-center text-xs text-zinc-500">
+                No 7-day trend data available.
+            </div>
+        );
+    }
+
+    const values = points.map((p) => Number(p[currency] || 0)).filter(Boolean);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    const polyline = points
+        .map((p, index) => {
+            const x = (index / Math.max(points.length - 1, 1)) * 100;
+            const y = 40 - ((Number(p[currency]) - min) / range) * 35;
+            return `${x},${y}`;
+        })
+        .join(" ");
+
+    return (
+        <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+                <div>
+                    <div className="text-sm font-semibold text-zinc-950">
+                        7-Day {currency}/SGD Trend
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                        Source: {history.source}
+                    </div>
+                </div>
+
+                <div className="text-right text-xs text-zinc-500">
+                    <div>High: {max.toFixed(4)}</div>
+                    <div>Low: {min.toFixed(4)}</div>
+                </div>
+            </div>
+
+            <svg viewBox="0 0 100 45" className="h-28 w-full">
+                <polyline
+                    points={polyline}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    className="text-red-700"
+                />
+            </svg>
+
+            <div className="mt-2 flex justify-between text-[10px] text-zinc-400">
+                <span>{points[0]?.date}</span>
+                <span>{points[points.length - 1]?.date}</span>
+            </div>
+        </div>
+    );
+}
+
+function RateComparison({ comparison }) {
+    if (!comparison?.comparison?.length) return null;
+
+    return (
+        <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+            <div className="mb-3">
+                <div className="text-sm font-semibold text-zinc-950">
+                    FX Provider Rate Comparison
+                </div>
+                <div className="mt-1 text-xs text-zinc-500">
+                    Compares the main FX provider with a backup provider for better reliability.
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                {comparison.comparison.map((item) => (
+                    <div
+                        key={item.code}
+                        className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-xs"
+                    >
+                        <div>
+                            <div className="font-semibold text-zinc-900">{item.pair}</div>
+                            <div className="text-zinc-400">
+                                Difference: {Number(item.difference).toFixed(4)}
+                            </div>
+                        </div>
+
+                        <div className="text-right text-zinc-500">
+                            <div>
+                                Frankfurter:{" "}
+                                <span className="font-mono text-zinc-800">
+                                    {Number(item.primary_rate).toFixed(4)}
+                                </span>
+                            </div>
+                            <div>
+                                Backup API:{" "}
+                                <span className="font-mono text-zinc-800">
+                                    {Number(item.backup_rate).toFixed(4)}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function ForexPage() {
     const [me, setMe] = useState(null);
     const [rates, setRates] = useState(null);
+    const [comparison, setComparison] = useState(null);
+    const [history, setHistory] = useState(null);
     const [currency, setCurrency] = useState("USD");
     const [amount, setAmount] = useState("100");
     const [quote, setQuote] = useState(null);
@@ -89,6 +199,7 @@ export function ForexPage() {
     const [buying, setBuying] = useState(false);
     const [error, setError] = useState("");
     const [returnStatus, setReturnStatus] = useState(null);
+    const [riskAccepted, setRiskAccepted] = useState(false);
 
     const selectedRate = useMemo(() => {
         return rates?.rates?.find((r) => r.code === currency) ?? null;
@@ -99,14 +210,18 @@ export function ForexPage() {
         setError("");
 
         try {
-            const [profile, fxRates, orderList] = await Promise.all([
+            const [profile, fxRates, rateCompare, rateHistory, orderList] = await Promise.all([
                 api.get("/api/auth/me"),
                 api.get("/api/ong-xuan/forex/rates"),
+                api.get("/api/ong-xuan/forex/rate-comparison").catch(() => null),
+                api.get("/api/ong-xuan/forex/history").catch(() => null),
                 api.get("/api/ong-xuan/forex/orders").catch(() => []),
             ]);
 
             setMe(profile);
             setRates(fxRates);
+            setComparison(rateCompare);
+            setHistory(rateHistory);
             setOrders(orderList);
         } catch (err) {
             setError(err.message || "Unable to load forex data");
@@ -135,6 +250,7 @@ export function ForexPage() {
         event.preventDefault();
         setQuoting(true);
         setError("");
+        setRiskAccepted(false);
 
         try {
             const data = await api.post("/api/ong-xuan/forex/quote", {
@@ -153,6 +269,11 @@ export function ForexPage() {
     async function confirmBuy() {
         if (!quote) return;
 
+        if (!riskAccepted) {
+            setError("Please accept the FX risk acknowledgement before confirming the purchase.");
+            return;
+        }
+
         setBuying(true);
         setError("");
 
@@ -169,6 +290,7 @@ export function ForexPage() {
 
             setOrders((current) => [data.order, ...current]);
             setQuote(null);
+            setRiskAccepted(false);
         } catch (err) {
             setError(err.message || "Unable to complete purchase");
         } finally {
@@ -198,7 +320,7 @@ export function ForexPage() {
 
                             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
                                 Buy USD, EUR or GBP using Singapore Dollars. Rates are retrieved
-                                from an external FX API and purchases are linked to the customer
+                                from external FX APIs and purchases are linked to the customer
                                 profile from PayPal login.
                             </p>
                         </div>
@@ -257,34 +379,36 @@ export function ForexPage() {
                                     pair: `${code}/SGD`,
                                     sgd_per_unit: 0,
                                 }))).map((r) => (
-                                    <button
-                                        key={r.code}
-                                        onClick={() => {
-                                            setCurrency(r.code);
-                                            setQuote(null);
-                                        }}
-                                        className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${currency === r.code
-                                                ? "border-red-300 bg-red-50"
-                                                : "border-zinc-200 bg-white"
-                                            }`}
-                                    >
-                                        <div className="text-xs font-medium text-zinc-500">
-                                            {r.pair}
-                                        </div>
+                                <button
+                                    key={r.code}
+                                    onClick={() => {
+                                        setCurrency(r.code);
+                                        setQuote(null);
+                                        setRiskAccepted(false);
+                                    }}
+                                    className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
+                                        currency === r.code
+                                            ? "border-red-300 bg-red-50"
+                                            : "border-zinc-200 bg-white"
+                                    }`}
+                                >
+                                    <div className="text-xs font-medium text-zinc-500">
+                                        {r.pair}
+                                    </div>
 
-                                        <div className="mt-2 text-2xl font-semibold text-zinc-950">
-                                            {num(r.sgd_per_unit || 0)}
-                                        </div>
+                                    <div className="mt-2 text-2xl font-semibold text-zinc-950">
+                                        {num(r.sgd_per_unit || 0)}
+                                    </div>
 
-                                        <div className="mt-1 text-xs text-zinc-400">
-                                            SGD per 1 {r.code}
-                                        </div>
+                                    <div className="mt-1 text-xs text-zinc-400">
+                                        SGD per 1 {r.code}
+                                    </div>
 
-                                        <div className="mt-3 text-xs leading-5 text-zinc-500">
-                                            {currencyNotes[r.code]}
-                                        </div>
-                                    </button>
-                                ))}
+                                    <div className="mt-3 text-xs leading-5 text-zinc-500">
+                                        {currencyNotes[r.code]}
+                                    </div>
+                                </button>
+                            ))}
                         </div>
 
                         <form
@@ -302,6 +426,7 @@ export function ForexPage() {
                                         onChange={(e) => {
                                             setCurrency(e.target.value);
                                             setQuote(null);
+                                            setRiskAccepted(false);
                                         }}
                                         className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-300"
                                     >
@@ -321,7 +446,11 @@ export function ForexPage() {
                                         min="1"
                                         step="0.01"
                                         value={amount}
-                                        onChange={(e) => setAmount(e.target.value)}
+                                        onChange={(e) => {
+                                            setAmount(e.target.value);
+                                            setQuote(null);
+                                            setRiskAccepted(false);
+                                        }}
                                         className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-300"
                                         placeholder="100"
                                     />
@@ -343,6 +472,9 @@ export function ForexPage() {
                                 </div>
                             ) : null}
                         </form>
+
+                        <MiniTrendChart history={history} currency={currency} />
+                        <RateComparison comparison={comparison} />
                     </section>
 
                     <aside className="rounded-[24px] border border-zinc-200 bg-white p-5 shadow-sm">
@@ -370,6 +502,13 @@ export function ForexPage() {
 
                                 <div className="space-y-2 rounded-2xl border border-zinc-200 p-4 text-sm">
                                     <div className="flex justify-between">
+                                        <span className="text-zinc-500">Quote ID</span>
+                                        <span className="font-mono text-xs">
+                                            {quote.quote_id}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex justify-between">
                                         <span className="text-zinc-500">Rate</span>
                                         <span className="font-mono">
                                             1 {quote.currency} = {num(quote.sgd_rate)} SGD
@@ -392,10 +531,23 @@ export function ForexPage() {
                                     </div>
                                 </div>
 
+                                <label className="flex gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-xs leading-5 text-zinc-600">
+                                    <input
+                                        type="checkbox"
+                                        checked={riskAccepted}
+                                        onChange={(e) => setRiskAccepted(e.target.checked)}
+                                        className="mt-1"
+                                    />
+                                    <span>
+                                        I understand that foreign exchange rates may fluctuate and
+                                        the displayed quote is for demo purposes.
+                                    </span>
+                                </label>
+
                                 <Button
                                     className="w-full rounded-xl py-3 text-sm"
                                     onClick={confirmBuy}
-                                    disabled={buying}
+                                    disabled={buying || !riskAccepted}
                                 >
                                     {buying ? "Processing…" : "Confirm Buy with PayPal"}
                                 </Button>
@@ -434,6 +586,7 @@ export function ForexPage() {
                                         <th className="px-4 py-3">Order</th>
                                         <th className="px-4 py-3">Currency</th>
                                         <th className="px-4 py-3">Amount</th>
+                                        <th className="px-4 py-3">Rate</th>
                                         <th className="px-4 py-3">Total SGD</th>
                                         <th className="px-4 py-3">Status</th>
                                     </tr>
@@ -452,6 +605,10 @@ export function ForexPage() {
 
                                             <td className="px-4 py-3">
                                                 {o.amount} {o.currency}
+                                            </td>
+
+                                            <td className="px-4 py-3 font-mono">
+                                                {num(o.sgd_rate)}
                                             </td>
 
                                             <td className="px-4 py-3 font-mono">
