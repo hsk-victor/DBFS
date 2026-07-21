@@ -51,6 +51,10 @@ export default function App() {
     api.get("/api/auth/me").then(setMe).catch(() => setMe({ authenticated: false, paypal_configured: false }));
     // Coming back from a PayPal approval redirect?
     const q = new URLSearchParams(window.location.search);
+    const sectionFromQuery = (q.get("section") ?? "").trim().toLowerCase();
+    if (sectionFromQuery === "crypto" || q.has("crypto_order_status") || q.has("crypto_order_id")) {
+      setSection("Crypto");
+    }
     const status = q.get("order_status");
     if (status) {
       setOrderReturn({ status, orderId: q.get("order_id") ?? "" });

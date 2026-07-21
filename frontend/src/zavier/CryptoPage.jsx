@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Canvas, loadView } from "@/victor/stocks/components/canvas/Canvas";
 import { CryptoCard } from "@/zavier/crypto/components/CryptoCard";
 import { CryptoBuyDialog } from "@/zavier/crypto/components/CryptoBuyDialog";
+import { CryptoOrderResultDialog } from "@/zavier/crypto/components/CryptoOrderResultDialog";
 import { COINS } from "@/zavier/crypto/constants";
 import { useCryptoDashboard } from "@/zavier/crypto/hooks/useCryptoDashboard";
+import { cryptoApi } from "@/zavier/crypto/lib/cryptoApi";
 
 export function CryptoPage() {
     const dashboard = useCryptoDashboard();
     const [view, setView] = useState(loadView);
     const [buyCoin, setBuyCoin] = useState(null);
+    const [orderResult, setOrderResult] = useState(null);
     const [cards, setCards] = useState(() => [
         { sym: "BTC", x: 36, y: 36, w: 344, h: 400, z: 1, tab: "overview", big: false },
         { sym: "ETH", x: 412, y: 92, w: 344, h: 400, z: 2, tab: "overview", big: false },
@@ -29,6 +32,37 @@ export function CryptoPage() {
     const removeCard = (sym) => {
         setCards((prev) => prev.filter((card) => card.sym !== sym));
     };
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get("crypto_order_status");
+        const orderId = params.get("crypto_order_id");
+        if (!status || !orderId)
+            return;
+
+        let alive = true;
+        cryptoApi.orderStatus(orderId)
+            .then((payload) => {
+                if (!alive)
+                    return;
+                setOrderResult({ status, order: payload.order ?? null, paypal: payload.paypal ?? null });
+            })
+            .catch(() => {
+                if (!alive)
+                    return;
+                setOrderResult({ status, order: { order_id: orderId, status }, paypal: null });
+            })
+            .finally(() => {
+                const next = new URL(window.location.href);
+                next.searchParams.delete("crypto_order_status");
+                next.searchParams.delete("crypto_order_id");
+                window.history.replaceState({}, "", next.pathname + next.search);
+            });
+
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     return (
         <div className="relative flex flex-1 flex-col overflow-hidden bg-zinc-50">
@@ -73,8 +107,14 @@ export function CryptoPage() {
                     quote={buyCoin.quote}
                     fxRate={dashboard.fx.rate}
                     onClose={() => setBuyCoin(null)}
+                    onSuccess={(payload) => {
+                        setBuyCoin(null);
+                        setOrderResult({ status: payload?.order?.status ?? "filled", order: payload?.order ?? null, paypal: payload?.paypal ?? null });
+                    }}
                 />
             )}
+
+            {orderResult && <CryptoOrderResultDialog result={orderResult} onClose={() => setOrderResult(null)} />}
         </div>
     );
 }

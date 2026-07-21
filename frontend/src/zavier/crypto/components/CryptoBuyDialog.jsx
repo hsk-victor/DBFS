@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogPopup } from "@/shared/components/ui/dialog";
 import { fmtPct, fmtSgd, fmtUsd } from "@/shared/lib/format";
+import { cryptoApi } from "@/zavier/crypto/lib/cryptoApi";
 
 function Seg({ value, options, onChange }) {
     return (
@@ -24,10 +25,12 @@ function Seg({ value, options, onChange }) {
     );
 }
 
-export function CryptoBuyDialog({ coin, quote, fxRate, onClose }) {
+export function CryptoBuyDialog({ coin, quote, fxRate, onClose, onSuccess }) {
     const [mode, setMode] = useState("shares");
     const [qty, setQty] = useState(1);
     const [cash, setCash] = useState("500");
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState("");
 
     const price = Number(quote?.price ?? 0);
     const changePct = Number(quote?.change_pct ?? 0);
@@ -35,6 +38,36 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose }) {
     const estQty = useMemo(() => (mode === "cash" && price > 0 ? cashVal / fxRate / price : qty), [mode, cashVal, fxRate, price, qty]);
     const usd = estQty * price;
     const sgd = usd * fxRate;
+
+    const submit = async () => {
+        if (submitting)
+            return;
+        setSubmitting(true);
+        setError("");
+        try {
+            const payload = {
+                symbol: coin?.symbol,
+                side: "buy",
+                order_type: "market",
+                mode,
+                qty,
+                cash_sgd: cashVal,
+                price_usd: price,
+                fx_rate: fxRate,
+            };
+            const response = await cryptoApi.order(payload);
+            if (response?.approve_url) {
+                window.location.href = response.approve_url;
+                return;
+            }
+            onSuccess?.(response);
+            onClose();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Order failed");
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -117,11 +150,16 @@ export function CryptoBuyDialog({ coin, quote, fxRate, onClose }) {
                     <div className="font-mono text-[22px] font-bold tracking-tight">S${sgd.toFixed(2)}</div>
                 </div>
                 <div className="mt-1 text-right text-[11px] text-zinc-400">
-                    Crypto buy popup is open; order routing is not wired yet.
+                    Market buy routes through /api/crypto/orders.
                 </div>
 
-                <Button onClick={onClose} className="mt-4 w-full rounded-[10px] py-[11px] text-[13.5px]">
-                    Close
+                {error && <div className="mt-2 text-center text-[11.5px] text-red-800">{error}</div>}
+
+                <Button onClick={submit} disabled={submitting || estQty <= 0} className="mt-4 w-full rounded-[10px] py-[11px] text-[13.5px]">
+                    {submitting ? "Processing..." : "Continue with PayPal"}
+                </Button>
+                <Button variant="ghost" onClick={onClose} className="mt-2 w-full rounded-[9px] py-2 font-medium">
+                    Cancel
                 </Button>
             </DialogPopup>
         </Dialog>
