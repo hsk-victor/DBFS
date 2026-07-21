@@ -13,6 +13,41 @@ PAIRS = (
     ("XRP", "XRP-USD.CC"),
 )
 
+# NOT COUNTED WITHIN THE 10 URIS
+def usd_sgd(force: bool = False):
+    """Return the live USD→SGD exchange rate from EODHD forex data."""
+
+    def live():
+        if not Config.EODHD_API_KEY:
+            raise ValueError("no eodhd key")
+        payload = get_json(
+            f"{BASE}/real-time/USDSGD.FOREX",
+            params={"api_token": Config.EODHD_API_KEY, "fmt": "json"},
+        )
+        if not isinstance(payload, dict):
+            raise ValueError("empty fx quote")
+
+        rate = payload.get("close")
+        if rate is None:
+            rate = payload.get("price")
+        if rate is None:
+            raise ValueError("empty fx quote")
+
+        return {
+            "rate": float(rate),
+            "date": payload.get("timestamp") or payload.get("datetime") or payload.get("date") or "",
+            "provider": "EODHD Forex",
+            "raw": payload,
+        }
+
+    return cached_fetch(
+        "eodhd:fx:usdsgd",
+        6 * 3600,
+        live,
+        lambda: {"rate": Config.FALLBACK_USD_SGD, "date": "", "provider": "fixed fallback"},
+        force=force,
+    )
+
 
 def realtime_price(symbol: str, provider_symbol: str, force: bool = False):
     """Return the latest EODHD price for one crypto symbol."""
@@ -33,9 +68,24 @@ def realtime_price(symbol: str, provider_symbol: str, force: bool = False):
         if price is None:
             raise ValueError("empty quote")
 
+        change_pct = payload.get("change_p")
+        if change_pct is None:
+            previous_close = payload.get("previousClose")
+            try:
+                p = float(price)
+                if previous_close not in (None, 0, "0"):
+                    pc = float(previous_close)
+                    change_pct = ((p - pc) / pc) * 100
+                elif payload.get("open") not in (None, 0, "0"):
+                    op = float(payload.get("open"))
+                    change_pct = ((p - op) / op) * 100
+            except (TypeError, ValueError, ZeroDivisionError):
+                change_pct = None
+
         return {
             "symbol": symbol,
             "price": float(price),
+            "change_pct": float(change_pct) if change_pct is not None else 0.0,
             "open": payload.get("open"),
             "high": payload.get("high"),
             "low": payload.get("low"),
@@ -112,52 +162,5 @@ def eod_series_all(force: bool = False):
     items = []
     for symbol, provider_symbol in PAIRS:
         payload, source = eod_series(symbol, provider_symbol, force=force)
-        items.append({**payload, "source": source})
-    return items
-
-
-def fundamentals(symbol: str, provider_symbol: str, force: bool = False):
-    """URI: GET /api/fundamentals/{symbol} — fundamentals payload for one symbol."""
-
-    def live():
-        if not Config.EODHD_API_KEY:
-            raise ValueError("no eodhd key")
-        payload = get_json(
-            f"{BASE}/fundamentals/{provider_symbol}",
-            params={"api_token": Config.EODHD_API_KEY, "fmt": "json"},
-        )
-        if not isinstance(payload, dict) or not payload:
-            raise ValueError("empty fundamentals")
-
-        general = payload.get("General") or {}
-        highlights = payload.get("Highlights") or {}
-        market_cap = highlights.get("MarketCapitalization")
-        if market_cap is None:
-            market_cap = highlights.get("MarketCapitalizationMln")
-
-        return {
-            "symbol": symbol,
-            "name": general.get("Name"),
-            "description": general.get("Description"),
-            "type": general.get("Type"),
-            "currency": general.get("CurrencyCode"),
-            "market_cap": market_cap,
-            "raw": payload,
-        }
-
-    return cached_fetch(
-        f"eodhd:fundamentals:{symbol}",
-        24 * 3600,
-        live,
-        lambda: {"symbol": symbol, "name": None, "market_cap": None},
-        force=force,
-    )
-
-
-def fundamentals_all(force: bool = False):
-    """Return fundamentals for BTC, ETH, XRP."""
-    items = []
-    for symbol, provider_symbol in PAIRS:
-        payload, source = fundamentals(symbol, provider_symbol, force=force)
         items.append({**payload, "source": source})
     return items

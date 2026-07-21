@@ -3,7 +3,6 @@ import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogPopup } from "@/shared/components/ui/dialog";
 import { fmtPct, fmtSgd, fmtUsd, SENT_BG, SENT_FG } from "@/shared/lib/format";
 import { CryptoChartPanel } from "@/zavier/crypto/components/CryptoChartPanel";
-import { CryptoDataGrid } from "@/zavier/crypto/components/CryptoDataGrid";
 import { CryptoNewsList } from "@/zavier/crypto/components/CryptoNewsList";
 import { CryptoTabs } from "@/zavier/crypto/components/CryptoTabs";
 import { TABS } from "@/zavier/crypto/constants";
@@ -80,6 +79,26 @@ export function CryptoDialog({ coin, quote, fxRate, onClose }) {
                                     <div className="mt-2.5 border-t border-dashed border-zinc-200 pt-2 text-[10.5px] text-zinc-400">
                                         GNews headlines + EODHD history + fundamentals cards
                                     </div>
+                                    <div className="mt-3 border-t border-zinc-100 pt-3">
+                                        <div className="mb-2 font-mono text-[10.5px] text-zinc-400">Fundamentals</div>
+                                        {details.fund ? (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {[["Name", details.fund.name ?? coin?.name ?? symbol], ["Type", details.fund.type ?? "—"], ["Currency", details.fund.currency ?? "—"], ["Market cap", details.fund.market_cap ? `$${Number(details.fund.market_cap).toLocaleString()}` : "—"], ["Symbol", details.fund.symbol ?? symbol]].map(([key, value]) => (
+                                                    <div key={key} className="rounded-[9px] border border-zinc-100 px-2.5 py-2">
+                                                        <div className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-400">{key}</div>
+                                                        <div className="mt-[3px] font-mono text-[13.5px] font-semibold">{value}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="py-2 text-xs text-zinc-400">No fundamentals available</div>
+                                        )}
+                                        {details.fund?.description && (
+                                            <div className="mt-2.5 rounded-[9px] border border-zinc-100 px-3 py-2 text-[12px] leading-relaxed text-zinc-700">
+                                                {details.fund.description}
+                                            </div>
+                                        )}
+                                    </div>
                                 </>
                             )}
                         </>
@@ -89,9 +108,6 @@ export function CryptoDialog({ coin, quote, fxRate, onClose }) {
 
                     {details.tab === "chart" && <CryptoChartPanel candles={details.candles} loading={details.loading} fxRate={fxRate} />}
 
-                    {details.tab === "data" && (
-                        <CryptoDataGrid metrics={details.metrics} description={details.fund?.description} loading={details.loading} />
-                    )}
                 </div>
 
                 {details.error && <div className="mt-2 text-center text-[11.5px] text-red-800">{details.error}</div>}

@@ -12,6 +12,61 @@ COINS = (
 )
 
 
+def fundamentals(symbol: str, coin_id: str, force: bool = False):
+	"""URI: GET /coins/{id} — coin detail payload."""
+
+	def live():
+		headers = {}
+		if Config.COINGECKO_API_KEY:
+			headers["x-cg-demo-api-key"] = Config.COINGECKO_API_KEY
+
+		payload = get_json(
+			f"{BASE}/coins/{coin_id}",
+			params={
+				"localization": "false",
+				"tickers": "false",
+				"market_data": "true",
+				"community_data": "false",
+				"developer_data": "false",
+				"sparkline": "false",
+			},
+			headers=headers or None,
+		)
+		if not isinstance(payload, dict) or not payload:
+			raise ValueError("empty coingecko coin detail")
+
+		market_data = payload.get("market_data") or {}
+		market_cap = (market_data.get("market_cap") or {}).get("sgd")
+		if market_cap is None:
+			market_cap = (market_data.get("market_cap") or {}).get("usd")
+
+		return {
+			"symbol": symbol,
+			"name": payload.get("name") or symbol,
+			"description": (payload.get("description") or {}).get("en") or None,
+			"type": "coin",
+			"currency": "SGD",
+			"market_cap": market_cap,
+			"raw": payload,
+		}
+
+	return cached_fetch(
+		f"coingecko:fundamentals:{symbol}",
+		24 * 3600,
+		live,
+		lambda: {
+			"symbol": symbol,
+			"name": symbol,
+			"description": None,
+			"type": "coin",
+			"currency": "SGD",
+			"market_cap": None,
+			"raw": {},
+		},
+		force=force,
+	)
+
+
 def market_chart(symbol: str, coin_id: str, force: bool = False):
 	"""URI: GET /coins/{id}/market_chart?vs_currency=sgd&days=7"""
 
@@ -66,5 +121,14 @@ def market_chart_all(force: bool = False):
 	items = []
 	for symbol, coin_id in COINS:
 		payload, source = market_chart(symbol, coin_id, force=force)
+		items.append({**payload, "source": source})
+	return items
+
+
+def fundamentals_all(force: bool = False):
+	"""Return CoinGecko-backed fundamentals for BTC, ETH, and XRP."""
+	items = []
+	for symbol, coin_id in COINS:
+		payload, source = fundamentals(symbol, coin_id, force=force)
 		items.append({**payload, "source": source})
 	return items

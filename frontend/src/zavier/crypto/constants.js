@@ -8,5 +8,4 @@ export const TABS = [
     { id: "overview", label: "Overview" },
     { id: "news", label: "News" },
     { id: "chart", label: "Chart" },
-    { id: "data", label: "Data" },
 ];

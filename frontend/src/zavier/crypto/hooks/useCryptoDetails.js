@@ -7,13 +7,13 @@ export function useCryptoDetails(symbol, coin, activeTab) {
     const [loading, setLoading] = useState(false);
     const [newsLoading, setNewsLoading] = useState(false);
     const [loadedSymbol, setLoadedSymbol] = useState(null);
-    const inFlightSymbol = useRef(null);
     const [eod, setEod] = useState(null);
     const [fund, setFund] = useState(null);
+    const [chart, setChart] = useState(null);
     const [news, setNews] = useState(null);
     const [newsError, setNewsError] = useState("");
-    const [chart, setChart] = useState(null);
     const [error, setError] = useState("");
+    const inFlightSymbol = useRef(null);
     const currentTab = activeTab ?? tab;
 
     useEffect(() => {
@@ -30,26 +30,10 @@ export function useCryptoDetails(symbol, coin, activeTab) {
             setNews(null);
             setNewsError("");
             try {
-                console.info("[crypto/details] fetching", { symbol });
-                const [eodRes, fundRes, chartRes] = await Promise.allSettled([
-                    cryptoApi.eod(),
-                    cryptoApi.fundamentals(),
-                    cryptoApi.chart(),
-                ]);
+                // Keep the initial mount light: prices are handled elsewhere,
+                // and chart/data/news are loaded on-demand by tab.
                 if (!alive)
                     return;
-
-                console.info("[crypto/details] settled", {
-                    symbol,
-                    eod: eodRes.status,
-                    fundamentals: fundRes.status,
-                    chart: chartRes.status,
-                    news: "lazy",
-                });
-
-                setEod(eodRes.status === "fulfilled" ? (eodRes.value.items ?? []).find((item) => item.symbol === symbol) ?? null : null);
-                setFund(fundRes.status === "fulfilled" ? (fundRes.value.items ?? []).find((item) => item.symbol === symbol) ?? null : null);
-                setChart(chartRes.status === "fulfilled" ? (chartRes.value.items ?? []).find((item) => item.symbol === symbol) ?? null : null);
                 setLoadedSymbol(symbol);
             }
             catch (e) {
@@ -68,6 +52,93 @@ export function useCryptoDetails(symbol, coin, activeTab) {
             alive = false;
         };
     }, [symbol, loadedSymbol]);
+
+    useEffect(() => {
+        if (!symbol || chart !== null)
+            return;
+        let alive = true;
+        setLoading(true);
+        console.info("[crypto/details] request start", { symbol, endpoint: "/api/crypto/chart", force: false });
+        cryptoApi.chart()
+            .then((res) => {
+                if (!alive)
+                    return;
+                const next = (res.items ?? []).find((item) => item.symbol === symbol) ?? null;
+                setChart(next);
+                console.info("[crypto/details] chart settled", { symbol, status: "fulfilled", chartPoints: next?.points?.length ?? 0 });
+            })
+            .catch((e) => {
+                if (!alive)
+                    return;
+                setChart(null);
+                console.info("[crypto/details] chart settled", { symbol, status: "rejected", chartError: e instanceof Error ? e.message : String(e) });
+            })
+            .finally(() => {
+                if (alive)
+                    setLoading(false);
+            });
+        return () => {
+            alive = false;
+        };
+    }, [symbol, chart]);
+
+    useEffect(() => {
+        if (!symbol || currentTab !== "overview" || fund !== null)
+            return;
+        let alive = true;
+        setLoading(true);
+        console.info("[crypto/details] request start", { symbol, endpoint: "/api/crypto/fundamentals", force: false });
+        cryptoApi.fundamentals()
+            .then((res) => {
+                if (!alive)
+                    return;
+                const next = (res.items ?? []).find((item) => item.symbol === symbol) ?? null;
+                setFund(next);
+                console.info("[crypto/details] fundamentals settled", { symbol, status: "fulfilled", hasFund: Boolean(next) });
+            })
+            .catch((e) => {
+                if (!alive)
+                    return;
+                setFund(null);
+                console.info("[crypto/details] fundamentals settled", { symbol, status: "rejected", fundamentalsError: e instanceof Error ? e.message : String(e) });
+            })
+            .finally(() => {
+                if (alive)
+                    setLoading(false);
+            });
+        return () => {
+            alive = false;
+        };
+    }, [symbol, currentTab, fund]);
+
+    useEffect(() => {
+        if (!symbol || currentTab !== "overview" || eod !== null)
+            return;
+        let alive = true;
+        setLoading(true);
+        console.info("[crypto/details] request start", { symbol, endpoint: "/api/crypto/eod", force: false });
+        cryptoApi.eod()
+            .then((res) => {
+                if (!alive)
+                    return;
+                const next = (res.items ?? []).find((item) => item.symbol === symbol) ?? null;
+                setEod(next);
+                console.info("[crypto/details] eod settled", { symbol, status: "fulfilled", eodPoints: next?.points?.length ?? 0 });
+            })
+            .catch((e) => {
+                if (!alive)
+                    return;
+                setEod(null);
+                console.info("[crypto/details] eod settled", { symbol, status: "rejected", eodError: e instanceof Error ? e.message : String(e) });
+            })
+            .finally(() => {
+                if (alive)
+                    setLoading(false);
+            });
+        return () => {
+            alive = false;
+        };
+    }, [symbol, currentTab, eod]);
 
     useEffect(() => {
         if (!symbol || currentTab !== "news" || news !== null)
@@ -96,7 +167,6 @@ export function useCryptoDetails(symbol, coin, activeTab) {
                 if (alive)
                     setNewsLoading(false);
             });
-
         return () => {
             alive = false;
         };

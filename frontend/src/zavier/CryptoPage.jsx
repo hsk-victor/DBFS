@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Canvas, loadView } from "@/victor/stocks/components/canvas/Canvas";
 import { CryptoCard } from "@/zavier/crypto/components/CryptoCard";
+import { CryptoBuyDialog } from "@/zavier/crypto/components/CryptoBuyDialog";
 import { COINS } from "@/zavier/crypto/constants";
 import { useCryptoDashboard } from "@/zavier/crypto/hooks/useCryptoDashboard";
 
 export function CryptoPage() {
     const dashboard = useCryptoDashboard();
     const [view, setView] = useState(loadView);
+    const [buyCoin, setBuyCoin] = useState(null);
     const [cards, setCards] = useState(() => [
         { sym: "BTC", x: 36, y: 36, w: 344, h: 400, z: 1, tab: "overview", big: false },
         { sym: "ETH", x: 412, y: 92, w: 344, h: 400, z: 2, tab: "overview", big: false },
@@ -57,9 +59,22 @@ export function CryptoPage() {
                         onFront={() => bringFront(card.sym)}
                         onPatch={(patch) => patchCard(card.sym, patch)}
                         onRemove={() => removeCard(card.sym)}
+                        onBuy={() => setBuyCoin({
+                            coin: COINS.find((item) => item.symbol === card.sym) ?? { symbol: card.sym, name: card.sym },
+                            quote: dashboard.priceLookup[card.sym] ?? null,
+                        })}
                     />
                 ))}
             </Canvas>
+
+            {buyCoin && (
+                <CryptoBuyDialog
+                    coin={buyCoin.coin}
+                    quote={buyCoin.quote}
+                    fxRate={dashboard.fx.rate}
+                    onClose={() => setBuyCoin(null)}
+                />
+            )}
         </div>
     );
 }

@@ -3,13 +3,20 @@
 from flask import Blueprint, jsonify, request
 
 from .services.GNews import search_symbol_strict
-from .services.coingecko import market_chart_all
-from .services.eodhd import eod_series_all, fundamentals_all, realtime_prices
+from .services.coingecko import fundamentals_all, market_chart_all
+from .services.eodhd import eod_series_all, realtime_prices, usd_sgd
 from .services.paypal import userinfo_strict
 
 crypto_bp = Blueprint("crypto", __name__)
 
+# NOT COUNTED WITHIN THE 10 URIS
+@crypto_bp.get("/fx") 
+def fx():
+    force = str(request.args.get("force", "false")).lower() in {"1", "true", "yes", "on"}
+    payload, source = usd_sgd(force=force)
+    return jsonify({**payload, "source": source})
 
+# NOT COUNTED WITHIN THE 10 URIS
 @crypto_bp.get("/health")
 def health():
     return jsonify({"ok": True, "module": "crypto", "owner": "Zavier"})

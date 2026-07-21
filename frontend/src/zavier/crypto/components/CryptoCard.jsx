@@ -4,7 +4,6 @@ import { Sparkline } from "@/victor/stocks/components/charts/Sparkline";
 import { Button } from "@/shared/components/ui/button";
 import { fmtPct, fmtSgd, fmtUsd } from "@/shared/lib/format";
 import { CryptoChartPanel } from "@/zavier/crypto/components/CryptoChartPanel";
-import { CryptoDataGrid } from "@/zavier/crypto/components/CryptoDataGrid";
 import { CryptoNewsList } from "@/zavier/crypto/components/CryptoNewsList";
 import { CryptoTabs } from "@/zavier/crypto/components/CryptoTabs";
 import { TABS } from "@/zavier/crypto/constants";
@@ -68,19 +67,25 @@ export function CryptoCard({ card, coin, quote, fxRate, zoom, loading, onFront, 
                 <div className="min-h-0 flex-1 overflow-auto px-4 pb-1.5 pt-3" data-nodrag="1">
                     {tab === "overview" && (
                         <>
-                            <div className="mb-2 flex items-center gap-2">
-                                <span className={`rounded-full px-2 py-[3px] font-semibold uppercase tracking-wider text-[10px] ${changePct >= 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                                    {changePct >= 0 ? "Bullish" : "Bearish"}
-                                </span>
-                                <span className="font-mono text-[10.5px] text-zinc-400">
-                                    {details.loading ? "loading brief" : "offline brief"}
-                                </span>
-                            </div>
-                            <p className="m-0 text-[13px] leading-relaxed text-zinc-700">
-                                {details.eod?.description ?? `${coin?.name ?? symbol} market view and intraday movement.`}
-                            </p>
-                            <div className="mt-2.5 border-t border-dashed border-zinc-200 pt-2 text-[10.5px] text-zinc-400">
-                                Crypto-generated · Not financial advice
+                            <div className="mt-3 border-t border-zinc-100 pt-3">
+                                <div className="mb-2 font-mono text-[10.5px] text-zinc-400">Fundamentals</div>
+                                {details.fund ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[["Name", details.fund.name ?? coin?.name ?? symbol], ["Type", details.fund.type ?? "—"], ["Currency", details.fund.currency ?? "—"], ["Market cap", details.fund.market_cap ? `$${Number(details.fund.market_cap).toLocaleString()}` : "—"], ["Symbol", details.fund.symbol ?? symbol]].map(([key, value]) => (
+                                            <div key={key} className="rounded-[9px] border border-zinc-100 px-2.5 py-2">
+                                                <div className="font-mono text-[9.5px] uppercase tracking-wider text-zinc-400">{key}</div>
+                                                <div className="mt-[3px] font-mono text-[13.5px] font-semibold">{value}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="py-2 text-xs text-zinc-400">No fundamentals available</div>
+                                )}
+                                {details.fund?.description && (
+                                    <div className="mt-2.5 rounded-[9px] border border-zinc-100 px-3 py-2 text-[12px] leading-relaxed text-zinc-700">
+                                        {details.fund.description}
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
@@ -88,8 +93,6 @@ export function CryptoCard({ card, coin, quote, fxRate, zoom, loading, onFront, 
                     {tab === "news" && <CryptoNewsList news={details.news} loading={details.newsLoading} error={details.newsError} />}
 
                     {tab === "chart" && <CryptoChartPanel candles={details.candles} loading={details.loading} fxRate={fxRate} />}
-
-                    {tab === "data" && <CryptoDataGrid metrics={details.metrics} description={details.fund?.description} loading={details.loading} />}
                 </div>
 
                 {details.error && <div className="px-4 pb-2 text-[11px] text-red-800">{details.error}</div>}
