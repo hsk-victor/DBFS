@@ -9,7 +9,51 @@ COINS = (
 	("BTC", "bitcoin"),
 	("ETH", "ethereum"),
 	("XRP", "ripple"),
+	("SOL", "solana"),
+	("BNB", "binancecoin"),
+	("DOGE", "dogecoin"),
+	("ADA", "cardano"),
+	("TRX", "tron"),
+	("AVAX", "avalanche-2"),
+	("LINK", "chainlink"),
+	("DOT", "polkadot"),
+	("LTC", "litecoin"),
+	("BCH", "bitcoin-cash"),
+	("XLM", "stellar"),
+	("ATOM", "cosmos"),
+	("NEAR", "near"),
+	("APT", "aptos"),
+	("ARB", "arbitrum"),
+	("OP", "optimism"),
+	("FIL", "filecoin"),
+	("ALGO", "algorand"),
+	("ETC", "ethereum-classic"),
+	("UNI", "uniswap"),
+	("AAVE", "aave"),
+	("MKR", "maker"),
+	("SUI", "sui"),
+	("ICP", "internet-computer"),
+	("HBAR", "hedera-hashgraph"),
+	("VET", "vechain"),
+	("MATIC", "matic-network"),
+	("PEPE", "pepe"),
+	("SHIB", "shiba-inu"),
 )
+COINS_BY_SYMBOL = dict(COINS)
+
+
+def _normalize_symbols(symbols):
+	if not symbols:
+		return [symbol for symbol, _ in COINS]
+	seen = set()
+	selected = []
+	for raw in symbols:
+		symbol = str(raw or "").strip().upper()
+		if not symbol or symbol in seen or symbol not in COINS_BY_SYMBOL:
+			continue
+		seen.add(symbol)
+		selected.append(symbol)
+	return selected
 
 
 def fundamentals(symbol: str, coin_id: str, force: bool = False):
@@ -116,19 +160,21 @@ def market_chart(symbol: str, coin_id: str, force: bool = False):
 	)
 
 
-def market_chart_all(force: bool = False):
-	"""Return 7-day SGD market chart data for BTC, ETH, and XRP."""
+def market_chart_all(force: bool = False, symbols=None):
+	"""Return 7-day SGD market chart data for the requested symbol subset."""
 	items = []
-	for symbol, coin_id in COINS:
+	for symbol in _normalize_symbols(symbols):
+		coin_id = COINS_BY_SYMBOL[symbol]
 		payload, source = market_chart(symbol, coin_id, force=force)
 		items.append({**payload, "source": source})
 	return items
 
 
-def fundamentals_all(force: bool = False):
-	"""Return CoinGecko-backed fundamentals for BTC, ETH, and XRP."""
+def fundamentals_all(force: bool = False, symbols=None):
+	"""Return CoinGecko-backed fundamentals for the requested symbol subset."""
 	items = []
-	for symbol, coin_id in COINS:
+	for symbol in _normalize_symbols(symbols):
+		coin_id = COINS_BY_SYMBOL[symbol]
 		payload, source = fundamentals(symbol, coin_id, force=force)
 		items.append({**payload, "source": source})
 	return items

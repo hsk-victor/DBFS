@@ -10,6 +10,8 @@ import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogPopup } from "@/shared/components/ui/dialog";
 import { api } from "@/shared/lib/api";
 import { CryptoPage } from "@/zavier/CryptoPage";
+import { COINS } from "@/zavier/crypto/constants";
+import { requestCryptoAddSymbol, requestCryptoRefresh } from "@/zavier/crypto/lib/topbarRefresh";
 import { OtherPage } from "@/ong_xuan/OtherPage";
 /** Result banner after returning from a real PayPal checkout redirect. */
 function OrderReturnDialog({ status, orderId, onClose }) {
@@ -42,6 +44,7 @@ function OrderReturnDialog({ status, orderId, onClose }) {
 export default function App() {
   const [me, setMe] = useState(null);
   const [section, setSection] = useState("Stocks");
+  const [cryptoFx, setCryptoFx] = useState({ rate: 1.2748, source: "demo", provider: "fixed fallback" });
   const [view, setView] = useState(loadView);
   const [trade, setTrade] = useState(null);
   const [orderReturn, setOrderReturn] = useState(null);
@@ -74,6 +77,24 @@ export default function App() {
     await api.post("/api/auth/logout").catch(() => { });
     setMe((m) => (m ? { ...m, authenticated: false, user: undefined } : m));
   }, []);
+  const refreshCryptoFx = useCallback(async () => {
+    try {
+      const payload = await api.get("/api/crypto/fx");
+      setCryptoFx({
+        rate: Number(payload?.rate ?? 1.2748),
+        source: String(payload?.source ?? "live"),
+        provider: String(payload?.provider ?? "EODHD Forex"),
+      });
+    }
+    catch {
+      // Keep the last known FX value in the topbar if refresh fails.
+    }
+  }, []);
+  useEffect(() => {
+    if (section !== "Crypto" || !authed)
+      return;
+    refreshCryptoFx();
+  }, [section, authed, refreshCryptoFx]);
   if (!me) {
     return (<div className="flex h-full items-center justify-center font-mono text-xs text-zinc-400">
       Connecting…
@@ -93,7 +114,14 @@ export default function App() {
     ? "Sandbox capture simulated (demo login)"
     : "Funds sent to the bank's PayPal merchant account";
   return (<div className="flex h-screen flex-col overflow-hidden bg-zinc-50">
-    <TopBar user={user} section={section} onSection={setSection} fx={dash.fx} loading={dash.loading} refreshing={dash.refreshing} refreshError={dash.refreshError} lastUpdatedAt={dash.lastUpdatedAt} dataState={dash.dataState} addableSymbols={dash.symbols.filter((s) => !onCanvas.has(s.symbol))} portfolioOnCanvas={!!pfCard} onAddSymbol={(sym) => dash.addCard(sym, view.pan.x, view.pan.y, view.zoom)} onAddPortfolio={() => dash.addCard("__PF", view.pan.x, view.pan.y, view.zoom)} onRefresh={dash.refreshMarket} onLogout={logout} />
+    <TopBar user={user} section={section} onSection={setSection} fx={section === "Crypto" ? cryptoFx : dash.fx} loading={dash.loading} refreshing={dash.refreshing} refreshError={dash.refreshError} lastUpdatedAt={dash.lastUpdatedAt} dataState={dash.dataState} addableSymbols={dash.symbols.filter((s) => !onCanvas.has(s.symbol))} cryptoAddableSymbols={COINS} portfolioOnCanvas={!!pfCard} onAddSymbol={(sym) => dash.addCard(sym, view.pan.x, view.pan.y, view.zoom)} onAddCryptoSymbol={(sym) => requestCryptoAddSymbol(sym)} onAddPortfolio={() => dash.addCard("__PF", view.pan.x, view.pan.y, view.zoom)} onRefresh={() => {
+      if (section === "Crypto") {
+        requestCryptoRefresh();
+        refreshCryptoFx();
+        return;
+      }
+      dash.refreshMarket();
+    }} onLogout={logout} />
 
     {section === "Stocks" ? (<Canvas view={view} setView={setView} empty={layout.length === 0 && dash.layout !== null ? (<div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
       <div className="text-sm text-zinc-500">Your watchlist is empty</div>

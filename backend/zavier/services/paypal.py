@@ -79,17 +79,50 @@ def _paypal_request(method: str, path: str, *, params=None, json_body=None, bear
 	return response.json()
 
 
-def create_order(amount_sgd: str, description: str, return_url: str, cancel_url: str) -> dict:
+def create_order(
+	*,
+	amount_sgd: str,
+	symbol: str,
+	shares: float,
+	price_usd: float,
+	fx_rate: float,
+	return_url: str,
+	cancel_url: str,
+) -> dict:
+	qty_label = f"{shares:.6f}".rstrip("0").rstrip(".")
+	item_name = f"Buy {qty_label} {symbol}"
+	description = f"USD{price_usd:.4f} FX{fx_rate:.4f}"
 	payload = _paypal_request(
 		"POST",
 		"/v2/checkout/orders",
 		json_body={
 			"intent": "CAPTURE",
 			"purchase_units": [{
-				"amount": {"currency_code": "SGD", "value": amount_sgd},
+				"amount": {
+					"currency_code": "SGD",
+					"value": amount_sgd,
+					"breakdown": {
+						"item_total": {
+							"currency_code": "SGD",
+							"value": amount_sgd,
+						},
+					},
+				},
 				"description": description,
+				"items": [{
+					"name": item_name,
+					"description": description,
+					"sku": f"{symbol}-SGD",
+					"category": "DIGITAL_GOODS",
+					"quantity": "1",
+					"unit_amount": {
+						"currency_code": "SGD",
+						"value": amount_sgd,
+					},
+				}],
 			}],
 			"application_context": {
+				"brand_name": "Straits Digital Bank",
 				"return_url": return_url,
 				"cancel_url": cancel_url,
 				"shipping_preference": "NO_SHIPPING",

@@ -33,7 +33,7 @@ function relativeUpdated(timestamp, now) {
     return `~${Math.floor(seconds / 3600)}h ago`;
   return `~${Math.floor(seconds / 86400)}d ago`;
 }
-export function TopBar({ user, section, onSection, fx, loading, refreshing, refreshError, lastUpdatedAt, dataState, addableSymbols, portfolioOnCanvas, onAddSymbol, onAddPortfolio, onRefresh, onLogout, }) {
+export function TopBar({ user, section, onSection, fx, loading, refreshing, refreshError, lastUpdatedAt, dataState, addableSymbols, cryptoAddableSymbols, portfolioOnCanvas, onAddSymbol, onAddCryptoSymbol, onAddPortfolio, onRefresh, onLogout, }) {
   const [stockSearch, setStockSearch] = useState("");
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -42,10 +42,14 @@ export function TopBar({ user, section, onSection, fx, loading, refreshing, refr
   }, []);
   const initials = user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "PP";
   const isStocks = section === "Stocks";
+  const isCrypto = section === "Crypto";
   const query = stockSearch.trim().toLowerCase();
   const filteredSymbols = query
     ? addableSymbols.filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query))
     : addableSymbols;
+  const filteredCrypto = query
+    ? (cryptoAddableSymbols || []).filter((coin) => coin.symbol.toLowerCase().includes(query) || coin.name.toLowerCase().includes(query))
+    : (cryptoAddableSymbols || []);
   return (<div className="relative z-[500] flex h-14 shrink-0 items-center gap-3.5 border-b border-zinc-200 bg-white px-5">
     <div className="flex items-center gap-2.5">
       <div className="flex size-7 items-center justify-center rounded-[7px] bg-zinc-900 font-mono text-[13px] font-semibold text-white">
@@ -129,6 +133,49 @@ export function TopBar({ user, section, onSection, fx, loading, refreshing, refr
         </MenuPopup>
       </Menu>
     </>)}
+
+    {isCrypto && (<button
+      type="button"
+      aria-label="Refresh crypto market data"
+      title="Refresh crypto prices and related data"
+      disabled={loading || refreshing}
+      onClick={onRefresh}
+      className="flex size-8 cursor-pointer items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+    </button>)}
+
+    {isCrypto && (<div className="rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-[5px] font-mono text-[11.5px] text-zinc-500">
+      1 USD = S${fx.rate.toFixed(4)} · {fx.source === "demo" ? "fixed" : "EODHD"}
+    </div>)}
+
+    {isCrypto && (<Menu onOpenChange={(open) => !open && setStockSearch("")}>
+      <MenuTrigger render={<Button variant="outline" className="px-3.5 py-[7px]">+ Add crypto</Button>} />
+      <MenuPopup align="end" className="w-[330px]">
+        <div className="relative mb-1.5" onClick={(event) => event.stopPropagation()}>
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400" />
+          <input
+            autoFocus
+            type="search"
+            value={stockSearch}
+            onChange={(event) => setStockSearch(event.target.value)}
+            onKeyDown={(event) => event.stopPropagation()}
+            placeholder="Search symbol or coin"
+            aria-label="Search cryptocurrencies"
+            className="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-8 pr-2.5 text-xs text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white"
+          />
+        </div>
+        <div className="max-h-[340px] overflow-y-auto">
+          {filteredCrypto.map((coin) => (<MenuItem key={coin.symbol} onClick={() => onAddCryptoSymbol?.(coin.symbol)}>
+            <span className="min-w-11 font-mono text-xs font-semibold">{coin.symbol}</span>
+            <span className="flex-1 truncate text-xs font-normal text-zinc-500">{coin.name}</span>
+          </MenuItem>))}
+          {filteredCrypto.length === 0 && (<div className="p-3 text-center text-xs text-zinc-400">
+            {query ? "No crypto assets match your search" : "No more crypto assets available"}
+          </div>)}
+        </div>
+      </MenuPopup>
+    </Menu>)}
 
     <div className="border-l border-zinc-200 pl-3.5">
       <Menu>

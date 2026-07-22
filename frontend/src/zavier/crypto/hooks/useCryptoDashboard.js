@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cryptoApi } from "@/zavier/crypto/lib/cryptoApi";
 
-export function useCryptoDashboard() {
+const DEFAULT_SYMBOLS = ["BTC", "ETH", "XRP"];
+
+export function useCryptoDashboard(inputSymbols = DEFAULT_SYMBOLS) {
+    const symbols = useMemo(() => {
+        const list = Array.isArray(inputSymbols) ? inputSymbols : DEFAULT_SYMBOLS;
+        return [...new Set(list.map((sym) => String(sym || "").toUpperCase().trim()).filter(Boolean))];
+    }, [inputSymbols]);
+    const symbolsKey = useMemo(() => symbols.join(","), [symbols]);
+
     const [fx, setFx] = useState({ rate: 1.2748, source: "demo" });
     const [quotes, setQuotes] = useState([]);
     const [eod, setEod] = useState([]);
@@ -47,8 +55,8 @@ export function useCryptoDashboard() {
         setError("");
         try {
             const [pricesRes, eodRes, fxRes] = await Promise.all([
-                cryptoApi.prices(),
-                cryptoApi.eod(),
+                cryptoApi.prices(symbols),
+                cryptoApi.eod(symbols),
                 cryptoApi.fx(),
             ]);
 
@@ -68,11 +76,11 @@ export function useCryptoDashboard() {
             setRefreshing(false);
             setLoading(false);
         }
-    }, [normalizeQuote]);
+    }, [normalizeQuote, symbolsKey]);
 
     useEffect(() => {
         refresh();
-    }, [refresh]);
+    }, [refresh, symbolsKey]);
 
     return {
         fx,

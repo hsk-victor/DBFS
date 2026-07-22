@@ -59,11 +59,11 @@ export function useCryptoDetails(symbol, coin, activeTab) {
         let alive = true;
         setLoading(true);
         console.info("[crypto/details] request start", { symbol, endpoint: "/api/crypto/chart", force: false });
-        cryptoApi.chart()
+        cryptoApi.chart([symbol])
             .then((res) => {
                 if (!alive)
                     return;
-                const next = (res.items ?? []).find((item) => item.symbol === symbol) ?? null;
+                const next = (res.items ?? [])[0] ?? null;
                 setChart(next);
                 console.info("[crypto/details] chart settled", { symbol, status: "fulfilled", chartPoints: next?.points?.length ?? 0 });
             })
@@ -88,11 +88,11 @@ export function useCryptoDetails(symbol, coin, activeTab) {
         let alive = true;
         setLoading(true);
         console.info("[crypto/details] request start", { symbol, endpoint: "/api/crypto/fundamentals", force: false });
-        cryptoApi.fundamentals()
+        cryptoApi.fundamentals([symbol])
             .then((res) => {
                 if (!alive)
                     return;
-                const next = (res.items ?? []).find((item) => item.symbol === symbol) ?? null;
+                const next = (res.items ?? [])[0] ?? null;
                 setFund(next);
                 console.info("[crypto/details] fundamentals settled", { symbol, status: "fulfilled", hasFund: Boolean(next) });
             })
@@ -112,16 +112,16 @@ export function useCryptoDetails(symbol, coin, activeTab) {
     }, [symbol, currentTab, fund]);
 
     useEffect(() => {
-        if (!symbol || currentTab !== "overview" || eod !== null)
+        if (!symbol || currentTab !== "chart" || eod !== null)
             return;
         let alive = true;
         setLoading(true);
         console.info("[crypto/details] request start", { symbol, endpoint: "/api/crypto/eod", force: false });
-        cryptoApi.eod()
+        cryptoApi.eod([symbol])
             .then((res) => {
                 if (!alive)
                     return;
-                const next = (res.items ?? []).find((item) => item.symbol === symbol) ?? null;
+                const next = (res.items ?? [])[0] ?? null;
                 setEod(next);
                 console.info("[crypto/details] eod settled", { symbol, status: "fulfilled", eodPoints: next?.points?.length ?? 0 });
             })
@@ -172,9 +172,8 @@ export function useCryptoDetails(symbol, coin, activeTab) {
         };
     }, [symbol, currentTab, news]);
 
-    const chartCandles = useMemo(() => mapCandles(chart?.points), [chart]);
     const eodCandles = useMemo(() => mapCandles(eod?.points), [eod]);
-    const candles = chartCandles.length ? chartCandles : eodCandles;
+    const candles = eodCandles;
     const spark = useMemo(() => mapSpark(chart?.points), [chart]);
 
     const metrics = useMemo(() => {

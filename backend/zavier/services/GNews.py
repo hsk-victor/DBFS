@@ -18,18 +18,20 @@ SYMBOL_ALIASES = {
 
 def _normalize_symbol(symbol: str) -> str:
 	cleaned = (symbol or "").strip().upper()
-	if cleaned not in SYMBOL_ALIASES:
-		raise ValueError("symbol must be one of: BTC, ETH, XRP")
+	if not cleaned:
+		raise ValueError("symbol is required")
+	if not re.fullmatch(r"[A-Z0-9]{2,15}", cleaned):
+		raise ValueError("invalid symbol format")
 	return cleaned
 
 
 def _build_query(symbol: str) -> str:
-	aliases = SYMBOL_ALIASES[symbol]
+	aliases = SYMBOL_ALIASES.get(symbol, (symbol.lower(), symbol))
 	return " OR ".join(f'"{name}"' for name in aliases)
 
 
 def _is_relevant(article: dict, symbol: str) -> bool:
-	aliases = SYMBOL_ALIASES[symbol]
+	aliases = SYMBOL_ALIASES.get(symbol, (symbol.lower(), symbol))
 	text = " ".join(
 		[
 			article.get("title") or "",

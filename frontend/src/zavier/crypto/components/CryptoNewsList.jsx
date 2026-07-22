@@ -1,11 +1,5 @@
 import { formatWhen } from "@/zavier/crypto/lib/cryptoFormat";
 
-function SentBadge({ tag }) {
-    const bg = tag === "Bullish" ? "#dcfce7" : tag === "Bearish" ? "#fee2e2" : "#f4f4f5";
-    const fg = tag === "Bullish" ? "#166534" : tag === "Bearish" ? "#991b1b" : "#52525b";
-    return <span className="rounded-full px-2 py-[3px] font-semibold uppercase tracking-wider text-[10px]" style={{ background: bg, color: fg }}>{tag}</span>;
-}
-
 export function CryptoNewsList({ news, loading, error }) {
     if (loading && !news)
         return (
@@ -28,7 +22,7 @@ export function CryptoNewsList({ news, loading, error }) {
 
     return (
         <>
-            {news.slice(0, 5).map((item, index) => (
+            {news.slice(0, 10).map((item, index) => (
                 <a
                     key={`${item.url}-${index}`}
                     href={item.url}
@@ -36,9 +30,6 @@ export function CryptoNewsList({ news, loading, error }) {
                     rel="noreferrer"
                     className="flex items-start gap-2 border-b border-zinc-100 py-[7px] no-underline"
                 >
-                    <span className="mt-[1px] shrink-0">
-                        <SentBadge tag={index % 3 === 0 ? "Bullish" : index % 3 === 1 ? "Neutral" : "Bearish"} />
-                    </span>
                     <span className="min-w-0">
                         <span className="block text-[12.5px] font-medium leading-snug text-zinc-900">{item.title}</span>
                         <span className="mt-0.5 block font-mono text-[10.5px] text-zinc-400">

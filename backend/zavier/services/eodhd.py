@@ -11,7 +11,37 @@ PAIRS = (
     ("BTC", "BTC-USD.CC"),
     ("ETH", "ETH-USD.CC"),
     ("XRP", "XRP-USD.CC"),
+    ("SOL", "SOL-USD.CC"),
+    ("BNB", "BNB-USD.CC"),
+    ("DOGE", "DOGE-USD.CC"),
+    ("ADA", "ADA-USD.CC"),
+    ("TRX", "TRX-USD.CC"),
+    ("AVAX", "AVAX-USD.CC"),
+    ("LINK", "LINK-USD.CC"),
+    ("DOT", "DOT-USD.CC"),
+    ("LTC", "LTC-USD.CC"),
+    ("BCH", "BCH-USD.CC"),
+    ("XLM", "XLM-USD.CC"),
+    ("ATOM", "ATOM-USD.CC"),
+    ("NEAR", "NEAR-USD.CC"),
+    ("APT", "APT-USD.CC"),
+    ("ARB", "ARB-USD.CC"),
+    ("OP", "OP-USD.CC"),
+    ("FIL", "FIL-USD.CC"),
+    ("ALGO", "ALGO-USD.CC"),
+    ("ETC", "ETC-USD.CC"),
+    ("UNI", "UNI-USD.CC"),
+    ("AAVE", "AAVE-USD.CC"),
+    ("MKR", "MKR-USD.CC"),
+    ("SUI", "SUI-USD.CC"),
+    ("ICP", "ICP-USD.CC"),
+    ("HBAR", "HBAR-USD.CC"),
+    ("VET", "VET-USD.CC"),
+    ("MATIC", "MATIC-USD.CC"),
+    ("PEPE", "PEPE-USD.CC"),
+    ("SHIB", "SHIB-USD.CC"),
 )
+PAIRS_BY_SYMBOL = dict(PAIRS)
 
 # NOT COUNTED WITHIN THE 10 URIS
 def usd_sgd(force: bool = False):
@@ -103,10 +133,25 @@ def realtime_price(symbol: str, provider_symbol: str, force: bool = False):
     )
 
 
-def realtime_prices(force: bool = False):
-    """Return latest prices for the fixed assignment symbols."""
+def _normalize_symbols(symbols):
+    if not symbols:
+        return [symbol for symbol, _ in PAIRS]
+    seen = set()
+    selected = []
+    for raw in symbols:
+        symbol = str(raw or "").strip().upper()
+        if not symbol or symbol in seen or symbol not in PAIRS_BY_SYMBOL:
+            continue
+        seen.add(symbol)
+        selected.append(symbol)
+    return selected
+
+
+def realtime_prices(force: bool = False, symbols=None):
+    """Return latest prices for the requested symbol subset."""
     quotes = []
-    for symbol, provider_symbol in PAIRS:
+    for symbol in _normalize_symbols(symbols):
+        provider_symbol = PAIRS_BY_SYMBOL[symbol]
         payload, source = realtime_price(symbol, provider_symbol, force=force)
         quotes.append({**payload, "source": source})
     return quotes
@@ -157,10 +202,11 @@ def eod_series(symbol: str, provider_symbol: str, force: bool = False):
     )
 
 
-def eod_series_all(force: bool = False):
-    """Return EOD candles for BTC, ETH, XRP."""
+def eod_series_all(force: bool = False, symbols=None):
+    """Return EOD candles for the requested symbol subset."""
     items = []
-    for symbol, provider_symbol in PAIRS:
+    for symbol in _normalize_symbols(symbols):
+        provider_symbol = PAIRS_BY_SYMBOL[symbol]
         payload, source = eod_series(symbol, provider_symbol, force=force)
         items.append({**payload, "source": source})
     return items

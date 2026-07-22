@@ -9,13 +9,14 @@ from ..config import Config
 from ..shared.auth import require_user
 from ..shared.database import supabase
 from .services.GNews import search_symbol_strict
-from .services.coingecko import fundamentals_all, market_chart_all
+from .services.coingecko import COINS as COINGECKO_COINS, fundamentals_all, market_chart_all
 from .services.eodhd import eod_series_all, realtime_prices, usd_sgd
 from .services.paypal import capture_order, create_order, create_payout, get_payout_batch, userinfo_strict
 
 crypto_bp = Blueprint("crypto", __name__)
 
-ALLOWED_CRYPTO = {"BTC", "ETH", "XRP"}
+ALLOWED_CRYPTO = {symbol for symbol, _ in COINGECKO_COINS}
+SYMBOL_LIST = [symbol for symbol, _ in COINGECKO_COINS]
 
 
 def _now_label() -> str:
@@ -25,6 +26,21 @@ def _now_label() -> str:
 def _read_user():
     user, err = require_user()
     return user, err
+
+
+def _parse_symbols_arg():
+    raw = str(request.args.get("symbols", "")).strip()
+    if not raw:
+        return SYMBOL_LIST
+    selected = []
+    seen = set()
+    for part in raw.split(","):
+        symbol = part.strip().upper()
+        if not symbol or symbol in seen or symbol not in ALLOWED_CRYPTO:
+            continue
+        seen.add(symbol)
+        selected.append(symbol)
+    return selected or SYMBOL_LIST
 
 
 def _insert_order(record: dict):
@@ -258,7 +274,10 @@ def create_crypto_order():
         try:
             created = create_order(
                 amount_sgd=f"{normalized['sgd_total']:.2f}",
-                description=f"{normalized['shares']} x {normalized['symbol']} @ ${normalized['price_usd']:.6f}",
+                symbol=normalized["symbol"],
+                shares=float(normalized["shares"]),
+                price_usd=float(normalized["price_usd"]),
+                fx_rate=float(normalized["fx_rate"]),
                 return_url=f"{base}/api/crypto/orders/paypal/return",
                 cancel_url=f"{base}/api/crypto/orders/paypal/cancel",
             )
@@ -420,29 +439,33 @@ def crypto_paypal_cancel():
 @crypto_bp.get("/prices")
 def prices():
     force = str(request.args.get("force", "false")).lower() in {"1", "true", "yes", "on"}
-    payload = realtime_prices(force=force)
-    return jsonify({"symbols": ["BTC", "ETH", "XRP"], "items": payload})
+    symbols = _parse_symbols_arg()
+    payload = realtime_prices(force=force, symbols=symbols)
+    return jsonify({"symbols": symbols, "items": payload})
 
 
 @crypto_bp.get("/eod")
 def eod():
     force = str(request.args.get("force", "false")).lower() in {"1", "true", "yes", "on"}
-    payload = eod_series_all(force=force)
-    return jsonify({"symbols": ["BTC", "ETH", "XRP"], "items": payload})
+    symbols = _parse_symbols_arg()
+    payload = eod_series_all(force=force, symbols=symbols)
+    return jsonify({"symbols": symbols, "items": payload})
 
 
 @crypto_bp.get("/fundamentals")
 def fundamentals():
     force = str(request.args.get("force", "false")).lower() in {"1", "true", "yes", "on"}
-    payload = fundamentals_all(force=force)
-    return jsonify({"symbols": ["BTC", "ETH", "XRP"], "items": payload})
+    symbols = _parse_symbols_arg()
+    payload = fundamentals_all(force=force, symbols=symbols)
+    return jsonify({"symbols": symbols, "items": payload})
 
 
 @crypto_bp.get("/chart")
 def chart():
     force = str(request.args.get("force", "false")).lower() in {"1", "true", "yes", "on"}
-    payload = market_chart_all(force=force)
-    return jsonify({"symbols": ["BTC", "ETH", "XRP"], "items": payload})
+    symbols = _parse_symbols_arg()
+    payload = market_chart_all(force=force, symbols=symbols)
+    return jsonify({"symbols": symbols, "items": payload})
 
 
 @crypto_bp.get("/news")

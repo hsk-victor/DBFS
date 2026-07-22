@@ -7,9 +7,9 @@ import { CryptoOrderResultDialog } from "@/zavier/crypto/components/CryptoOrderR
 import { COINS } from "@/zavier/crypto/constants";
 import { useCryptoDashboard } from "@/zavier/crypto/hooks/useCryptoDashboard";
 import { cryptoApi } from "@/zavier/crypto/lib/cryptoApi";
+import { ZAVIER_CRYPTO_ADD_EVENT, ZAVIER_CRYPTO_REFRESH_EVENT } from "@/zavier/crypto/lib/topbarRefresh";
 
 export function CryptoPage() {
-    const dashboard = useCryptoDashboard();
     const [view, setView] = useState(loadView);
     const [tradeCoin, setTradeCoin] = useState(null);
     const [orderResult, setOrderResult] = useState(null);
@@ -19,6 +19,9 @@ export function CryptoPage() {
         { sym: "XRP", x: 788, y: 36, w: 344, h: 400, z: 3, tab: "overview", big: false },
         { sym: "__CPF", x: 36, y: 470, w: 400, h: 356, z: 5, tab: "overview", big: false },
     ]);
+    const activeSymbols = cards.filter((card) => card.sym !== "__CPF").map((card) => card.sym);
+    const dashboard = useCryptoDashboard(activeSymbols);
+    const showLoadingOverlay = dashboard.loading || dashboard.refreshing;
 
     const patchCard = (sym, patch) => {
         setCards((prev) => prev.map((card) => (card.sym === sym ? { ...card, ...patch } : card)));
@@ -66,14 +69,50 @@ export function CryptoPage() {
         };
     }, []);
 
+    useEffect(() => {
+        const onTopbarRefresh = () => {
+            dashboard.refresh();
+        };
+        window.addEventListener(ZAVIER_CRYPTO_REFRESH_EVENT, onTopbarRefresh);
+        return () => window.removeEventListener(ZAVIER_CRYPTO_REFRESH_EVENT, onTopbarRefresh);
+    }, [dashboard]);
+
+    useEffect(() => {
+        const onTopbarAdd = (event) => {
+            const symbol = String(event?.detail?.symbol || "").toUpperCase().trim();
+            if (!symbol)
+                return;
+            if (!COINS.find((coin) => coin.symbol === symbol))
+                return;
+
+            setCards((previous) => {
+                const top = Math.max(10, ...previous.map((card) => card.z)) + 1;
+                const existing = previous.find((card) => card.sym === symbol);
+                if (existing)
+                    return previous.map((card) => card.sym === symbol ? { ...card, z: top } : card);
+
+                const n = previous.length;
+                const bx = Math.round((60 - view.pan.x) / view.zoom + (n % 4) * 40);
+                const by = Math.round((60 - view.pan.y) / view.zoom + (n % 4) * 40);
+                return [...previous, { sym: symbol, x: bx, y: by, w: 344, h: 400, z: top, tab: "overview", big: false }];
+            });
+        };
+
+        window.addEventListener(ZAVIER_CRYPTO_ADD_EVENT, onTopbarAdd);
+        return () => window.removeEventListener(ZAVIER_CRYPTO_ADD_EVENT, onTopbarAdd);
+    }, [view.pan.x, view.pan.y, view.zoom]);
+
     return (
         <div className="relative flex flex-1 flex-col overflow-hidden bg-zinc-50">
             <Canvas
                 view={view}
                 setView={setView}
-                empty={dashboard.loading ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                        <div className="text-sm text-zinc-500">Loading crypto watchlist</div>
+                empty={showLoadingOverlay ? (
+                    <div className="pointer-events-none absolute inset-0 z-[550] flex items-center justify-center bg-white/55 backdrop-blur-[1px]">
+                        <div className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 font-mono text-[11px] text-zinc-500 shadow-[0_6px_20px_rgba(0,0,0,0.05)]">
+                            <span className="size-1.5 rounded-full bg-zinc-400 anim-pulse" />
+                            <span>{dashboard.loading ? "Loading crypto market..." : "Refreshing crypto market..."}</span>
+                        </div>
                     </div>
                 ) : null}
             >
