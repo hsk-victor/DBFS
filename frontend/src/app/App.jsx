@@ -10,7 +10,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogPopup } from "@/shared/components/ui/dialog";
 import { api } from "@/shared/lib/api";
 import { CryptoPage } from "@/zavier/CryptoPage";
-import { OtherPage } from "@/ong_xuan/OtherPage";
+import { ForexPage } from "@/ong_xuan/ForexPage";
 /** Result banner after returning from a real PayPal checkout redirect. */
 function OrderReturnDialog({ status, orderId, onClose }) {
     const ok = status === "filled";
@@ -41,7 +41,10 @@ function OrderReturnDialog({ status, orderId, onClose }) {
 }
 export default function App() {
     const [me, setMe] = useState(null);
-    const [section, setSection] = useState("Stocks");
+    const [section, setSection] = useState(() => {
+        const requested = new URLSearchParams(window.location.search).get("section");
+        return ["Stocks", "Crypto", "Forex"].includes(requested) ? requested : "Stocks";
+    });
     const [view, setView] = useState(loadView);
     const [trade, setTrade] = useState(null);
     const [orderReturn, setOrderReturn] = useState(null);
@@ -102,7 +105,7 @@ export default function App() {
                     await api.post(`/api/orders/${id}/cancel`).catch(() => { });
                     dash.refreshOrders();
                 }}/>)}
-        </Canvas>) : section === "Crypto" ? (<CryptoPage />) : (<OtherPage />)}
+        </Canvas>) : section === "Crypto" ? (<CryptoPage />) : (<ForexPage />)}
 
       {trade && (<TradeDialog trade={trade} quote={dash.quotes[trade.sym]} fxRate={dash.fx.rate} fxProvider={dash.fx.source === "demo" ? "fixed rate" : "Frankfurter (ECB)"} ownedQty={ownedQty(trade.sym)} userEmail={user.email} merchantNote={merchantNote} onClose={() => setTrade(null)} onComplete={() => {
                 dash.refreshHoldings();

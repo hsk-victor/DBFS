@@ -279,8 +279,7 @@ export function ForexPage() {
 
         try {
             const data = await api.post("/api/ong-xuan/forex/buy", {
-                currency: quote.currency,
-                amount: quote.amount,
+                quote_id: quote.quote_id,
             });
 
             if (data.approve_url) {
@@ -509,6 +508,13 @@ export function ForexPage() {
                                     </div>
 
                                     <div className="flex justify-between">
+                                        <span className="text-zinc-500">Valid until</span>
+                                        <span className="font-mono text-xs">
+                                            {new Date(quote.expires_at * 1000).toLocaleTimeString("en-SG")}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex justify-between">
                                         <span className="text-zinc-500">Rate</span>
                                         <span className="font-mono">
                                             1 {quote.currency} = {num(quote.sgd_rate)} SGD
@@ -569,7 +575,7 @@ export function ForexPage() {
                             </h2>
 
                             <p className="mt-1 text-xs text-zinc-500">
-                                Stored in your current session for demo purposes.
+                                Persisted securely to your account.
                             </p>
                         </div>
                     </div>
