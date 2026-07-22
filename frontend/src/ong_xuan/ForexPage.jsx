@@ -194,6 +194,7 @@ export function ForexPage() {
     const [amount, setAmount] = useState("100");
     const [quote, setQuote] = useState(null);
     const [orders, setOrders] = useState([]);
+    const [holdings, setHoldings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [quoting, setQuoting] = useState(false);
     const [buying, setBuying] = useState(false);
@@ -210,12 +211,13 @@ export function ForexPage() {
         setError("");
 
         try {
-            const [profile, fxRates, rateCompare, rateHistory, orderList] = await Promise.all([
+            const [profile, fxRates, rateCompare, rateHistory, orderList, holdingList] = await Promise.all([
                 api.get("/api/auth/me"),
                 api.get("/api/ong-xuan/forex/rates"),
                 api.get("/api/ong-xuan/forex/rate-comparison").catch(() => null),
                 api.get("/api/ong-xuan/forex/history").catch(() => null),
                 api.get("/api/ong-xuan/forex/orders").catch(() => []),
+                api.get("/api/ong-xuan/forex/holdings").catch(() => []),
             ]);
 
             setMe(profile);
@@ -223,6 +225,7 @@ export function ForexPage() {
             setComparison(rateCompare);
             setHistory(rateHistory);
             setOrders(orderList);
+            setHoldings(holdingList);
         } catch (err) {
             setError(err.message || "Unable to load forex data");
         } finally {
@@ -288,6 +291,7 @@ export function ForexPage() {
             }
 
             setOrders((current) => [data.order, ...current]);
+            setHoldings(await api.get("/api/ong-xuan/forex/holdings"));
             setQuote(null);
             setRiskAccepted(false);
         } catch (err) {
@@ -568,6 +572,32 @@ export function ForexPage() {
                 </div>
 
                 <section className="mt-5 rounded-[24px] border border-zinc-200 bg-white p-5 shadow-sm">
+                    <div>
+                        <h2 className="text-lg font-semibold text-zinc-950">Forex Holdings</h2>
+                        <p className="mt-1 text-xs text-zinc-500">
+                            Currency balances persisted to your account.
+                        </p>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        {["USD", "EUR", "GBP"].map((code) => {
+                            const holding = holdings.find((item) => item.currency === code);
+                            return (
+                                <div key={code} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                                    <div className="text-xs font-medium text-zinc-500">{code} balance</div>
+                                    <div className="mt-2 text-2xl font-semibold text-zinc-950">
+                                        {num(holding?.amount, 2)} {code}
+                                    </div>
+                                    <div className="mt-1 text-xs text-zinc-400">
+                                        Avg. rate: {num(holding?.avg_sgd_rate)} SGD
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+
+                <section className="mt-5 rounded-[24px] border border-zinc-200 bg-white p-5 shadow-sm">
                     <div className="mb-4 flex items-center justify-between">
                         <div>
                             <h2 className="text-lg font-semibold text-zinc-950">
@@ -622,7 +652,7 @@ export function ForexPage() {
                                             </td>
 
                                             <td className="px-4 py-3">
-                                                <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                                                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(o.status)}`}>
                                                     {o.status}
                                                 </span>
                                             </td>
@@ -636,4 +666,12 @@ export function ForexPage() {
             </div>
         </main>
     );
+}
+
+function statusClass(status) {
+    if (status === "filled") return "bg-green-50 text-green-700";
+    if (status === "pending_paypal") return "bg-amber-50 text-amber-700";
+    if (status === "cancelled") return "bg-zinc-100 text-zinc-600";
+    if (status === "failed") return "bg-red-50 text-red-700";
+    return "bg-blue-50 text-blue-700";
 }

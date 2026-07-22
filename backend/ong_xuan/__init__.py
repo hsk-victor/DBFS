@@ -11,7 +11,7 @@ from flask import Blueprint, jsonify, redirect, request
 from ..config import Config
 from ..shared.auth import require_user
 from .services import paypal
-from .services.store import store
+from .services.store import PersistenceError, store
 
 forex_bp = Blueprint("ong_xuan_forex", __name__)
 
@@ -169,7 +169,7 @@ def _frontend_redirect(status, order_id=""):
 
 
 def _complete_order(user_id, order):
-    """Idempotently fill an order and credit its holding exactly once."""
+    """Idempotently complete through the store's transactional path."""
     latest = store.find_order(user_id, order["order_id"])
     if not latest:
         return None
@@ -177,16 +177,22 @@ def _complete_order(user_id, order):
         return latest
     if latest.get("status") != "pending_paypal":
         return None
-    # Mark first; repeated callbacks then observe filled and cannot credit again.
-    store.update_order(user_id, latest["order_id"], {"status": "filled"})
-    store.mark_quote_used(user_id, latest["quote_id"])
-    store.apply_fill(user_id, latest["currency"], float(latest["amount"]), float(latest["sgd_rate"]))
-    return store.find_order(user_id, latest["order_id"])
+    return store.complete_order(user_id, latest["order_id"])
+
+
+@forex_bp.errorhandler(PersistenceError)
+def persistence_error(exc):
+    return jsonify({"error": str(exc)}), 503
 
 
 @forex_bp.get("/health")
 def health():
-    return jsonify({"ok": True, "module": "forex", "owner": "Ong Xuan"})
+    return jsonify({
+        "ok": store.storage_status != "misconfigured",
+        "module": "forex", "owner": "Ong Xuan",
+        "storage": store.storage_status,
+        "paypal_checkout": paypal.configured(),
+    })
 
 
 @forex_bp.get("/rates")
@@ -260,7 +266,9 @@ def buy():
         return jsonify({"error": "an order already exists for this quote"}), 409
 
     order_id = "ONGX-FX-" + secrets.token_hex(4).upper()
-    real_paypal = paypal.configured() and not user.get("demo")
+    if not user.get("demo") and not paypal.configured():
+        return jsonify({"error": "Forex PayPal checkout is not configured"}), 503
+    real_paypal = not user.get("demo")
     try:
         if real_paypal:
             base = request.host_url.rstrip("/")
@@ -274,8 +282,11 @@ def buy():
         record = {
             "order_id": order_id, "quote_id": quote_id,
             "currency": accepted["currency"], "amount": accepted["amount"],
+            "customer_email": user.get("email", ""),
+            "currency_name": SUPPORTED[accepted["currency"]]["name"],
             "sgd_rate": accepted["sgd_rate"], "sgd_total": accepted["sgd_total"],
             "service_fee": accepted["service_fee"], "payable_sgd": accepted["payable_sgd"],
+            "rate_source": accepted["rate_source"], "rate_date": accepted["rate_date"],
             "status": "pending_paypal", "created_at": int(time.time()),
         }
         store.add_order(user["user_id"], record)
