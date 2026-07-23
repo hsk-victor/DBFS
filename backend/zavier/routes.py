@@ -46,20 +46,20 @@ def _parse_symbols_arg():
 def _insert_order(record: dict):
     if not supabase:
         raise RuntimeError("supabase is not configured")
-    supabase.table("orders").insert(record).execute()
+    supabase.table("crypto_orders").insert(record).execute()
 
 
 def _update_order(user_id: str, order_id: str, patch: dict):
     if not supabase:
         raise RuntimeError("supabase is not configured")
-    supabase.table("orders").update(patch).eq("user_id", user_id).eq("order_id", order_id).execute()
+    supabase.table("crypto_orders").update(patch).eq("user_id", user_id).eq("order_id", order_id).execute()
 
 
 def _find_order(user_id: str, order_id: str):
     if not supabase:
         raise RuntimeError("supabase is not configured")
     res = (
-        supabase.table("orders")
+        supabase.table("crypto_orders")
         .select("*")
         .eq("user_id", user_id)
         .eq("order_id", order_id)
@@ -73,7 +73,7 @@ def _find_holding(user_id: str, symbol: str):
     if not supabase:
         raise RuntimeError("supabase is not configured")
     res = (
-        supabase.table("holdings")
+        supabase.table("crypto_holdings")
         .select("qty,avg_price")
         .eq("user_id", user_id)
         .eq("symbol", symbol)
@@ -87,7 +87,7 @@ def _apply_crypto_fill(user_id: str, symbol: str, shares: float, price_usd: floa
     if not supabase:
         raise RuntimeError("supabase is not configured")
     res = (
-        supabase.table("holdings")
+        supabase.table("crypto_holdings")
         .select("qty,avg_price")
         .eq("user_id", user_id)
         .eq("symbol", symbol)
@@ -111,7 +111,7 @@ def _apply_crypto_fill(user_id: str, symbol: str, shares: float, price_usd: floa
     else:
         new_avg = price_usd
 
-    supabase.table("holdings").upsert({
+    supabase.table("crypto_holdings").upsert({
         "user_id": user_id,
         "symbol": symbol,
         "qty": new_qty,
@@ -134,10 +134,10 @@ def _apply_crypto_sell(user_id: str, symbol: str, shares: float):
     new_qty = old_qty - shares
     if new_qty <= 1e-9:
         # Schema enforces qty > 0, so fully liquidated holdings must be removed.
-        supabase.table("holdings").delete().eq("user_id", user_id).eq("symbol", symbol).execute()
+        supabase.table("crypto_holdings").delete().eq("user_id", user_id).eq("symbol", symbol).execute()
         return
 
-    supabase.table("holdings").upsert({
+    supabase.table("crypto_holdings").upsert({
         "user_id": user_id,
         "symbol": symbol,
         "qty": new_qty,
@@ -363,7 +363,7 @@ def crypto_holdings():
 
     try:
         res = (
-            supabase.table("holdings")
+            supabase.table("crypto_holdings")
             .select("symbol,qty,avg_price")
             .eq("user_id", user["user_id"])
             .execute()
