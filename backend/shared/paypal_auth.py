@@ -15,7 +15,10 @@ def authorize_url(state: str) -> str:
         "flowEntry": "static",
         "client_id": Config.PAYPAL_CLIENT_ID,
         "response_type": "code",
-        "scope": "openid profile email",
+        "scope": (
+            "openid profile email address "
+            "https://uri.paypal.com/services/paypalattributes"
+        ),
         "redirect_uri": Config.PAYPAL_REDIRECT_URI,
         "state": state,
     })
