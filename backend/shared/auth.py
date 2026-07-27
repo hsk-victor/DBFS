@@ -49,8 +49,19 @@ def demo_login():
     user = {
         "user_id": "demo-user-001",
         "name": "Tan Wei Ming",
+        "given_name": "Tan",
+        "family_name": "Wei Ming",
         "email": "tan.wm@sandbox.paypal.com",
+        "email_verified": True,
         "verified": True,
+        "payer_id": "DEMO-PAYER-001",
+        "address": {
+            "street_address": "10 Marina Boulevard",
+            "locality": "Singapore",
+            "region": "Singapore",
+            "country": "SG",
+            "postal_code": "018983",
+        },
         "demo": True,
     }
     session["user"] = user

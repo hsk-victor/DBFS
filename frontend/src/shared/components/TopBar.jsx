@@ -33,6 +33,12 @@ function relativeUpdated(timestamp, now) {
     return `~${Math.floor(seconds / 3600)}h ago`;
   return `~${Math.floor(seconds / 86400)}d ago`;
 }
+
+function profileValue(value, fallback = "—") {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
 export function TopBar({ user, section, onSection, fx, loading, refreshing, refreshError, lastUpdatedAt, dataState, addableSymbols, cryptoAddableSymbols, portfolioOnCanvas, onAddSymbol, onAddCryptoSymbol, onAddPortfolio, onRefresh, onLogout, }) {
   const [stockSearch, setStockSearch] = useState("");
   const [now, setNow] = useState(Date.now());
@@ -43,6 +49,8 @@ export function TopBar({ user, section, onSection, fx, loading, refreshing, refr
   const initials = user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "PP";
   const isStocks = section === "Stocks";
   const isCrypto = section === "Crypto";
+  const address = user.address || {};
+  const accountStatus = user.verified ? "Verified" : "Unverified";
   const query = stockSearch.trim().toLowerCase();
   const filteredSymbols = query
     ? addableSymbols.filter((stock) => stock.symbol.toLowerCase().includes(query) || stock.name.toLowerCase().includes(query))
@@ -186,7 +194,7 @@ export function TopBar({ user, section, onSection, fx, loading, refreshing, refr
           <div className="font-mono text-xs text-zinc-500">{user.email.split("@")[0] + "@" + (user.demo ? "sandbox" : user.email.split("@")[1] ?? "")}</div>
           <ChevronDown className="size-3 text-zinc-400" />
         </MenuTrigger>
-        <MenuPopup align="end" className="w-[260px]">
+        <MenuPopup align="end" className="w-[340px]">
           <div className="flex items-center gap-[11px] border-b border-zinc-100 px-2.5 pb-3 pt-2.5">
             <div className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[13px] font-semibold text-white">
               {initials}
@@ -196,18 +204,44 @@ export function TopBar({ user, section, onSection, fx, loading, refreshing, refr
               <div className="truncate font-mono text-[11px] text-zinc-400">{user.email}</div>
             </div>
           </div>
-          <div className="flex flex-col gap-[7px] border-b border-zinc-100 px-2.5 py-2">
+          <div className="border-b border-zinc-100 px-2.5 py-2">
+            <div className="mb-1 font-semibold text-zinc-500">Personal Information</div>
             {[
-              ["Account", user.demo ? "DEMO-****0001" : "SG-****" + user.user_id.slice(-4)],
-              ["PayPal Sandbox", user.demo ? "Demo login" : "Linked"],
-              ["Base currency", "SGD"],
-            ].map(([k, v]) => (<div key={k} className="flex justify-between text-[11.5px]">
+              ["Full Name", profileValue(user.name)],
+              ["Email", profileValue(user.email)],
+            ].map(([k, v]) => (<div key={k} className="mb-1.5 flex justify-between text-[11.5px] last:mb-0">
               <span className="text-zinc-500">{k}</span>
-              {k === "PayPal Sandbox" && !user.demo ? (<span className="flex items-center gap-[5px] font-mono font-medium text-green-800">
+              <span className="ml-3 truncate font-mono font-medium">{v}</span>
+            </div>))}
+
+            <div className="mb-1 mt-2.5 font-semibold text-zinc-500">Address</div>
+            {[
+              ["Street Address", profileValue(address.street_address)],
+              ["City", profileValue(address.locality)],
+              ["State", profileValue(address.region)],
+              ["Country", profileValue(address.country)],
+              ["Postal Code", profileValue(address.postal_code)],
+            ].map(([k, v]) => (<div key={k} className="mb-1.5 flex justify-between text-[11.5px] last:mb-0">
+              <span className="text-zinc-500">{k}</span>
+              <span className="ml-3 truncate font-mono font-medium">{v}</span>
+            </div>))}
+
+            <div className="mb-1 mt-2.5 font-semibold text-zinc-500">Account Information</div>
+            {[
+              ["Account verification status", accountStatus],
+              ["PayPal account ID (payer ID)", profileValue(user.payer_id, profileValue(user.user_id))],
+            ].map(([k, v]) => (<div key={k} className="mb-1.5 flex justify-between text-[11.5px] last:mb-0">
+              <span className="text-zinc-500">{k}</span>
+              {k === "Account verification status" && user.verified ? (<span className="ml-3 flex items-center gap-[5px] font-mono font-medium text-green-800">
                 <span className="size-1.5 rounded-full bg-green-500" />
                 {v}
-              </span>) : (<span className="font-mono font-medium">{v}</span>)}
+              </span>) : (<span className="ml-3 truncate font-mono font-medium">{v}</span>)}
             </div>))}
+
+            <div className="mt-2.5 flex justify-between text-[11.5px]">
+              <span className="text-zinc-500">Base currency</span>
+              <span className="font-mono font-medium">SGD</span>
+            </div>
           </div>
           <div className="pt-1.5">
             <MenuItem onClick={onLogout} className="text-red-800 data-[highlighted]:bg-red-100">

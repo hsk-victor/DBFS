@@ -46,9 +46,25 @@ def userinfo(user_access_token: str) -> dict:
     )
     response.raise_for_status()
     payload = response.json()
+    address = payload.get("address") or {}
+    given = str(payload.get("given_name") or "").strip()
+    family = str(payload.get("family_name") or "").strip()
+    full_name = str(payload.get("name") or "").strip() or " ".join(x for x in [given, family] if x).strip()
+
     return {
         "user_id": payload.get("user_id", payload.get("sub", "")),
-        "name": payload.get("name", ""),
+        "name": full_name,
         "email": payload.get("email", ""),
         "verified": payload.get("verified_account", False),
+        "given_name": given,
+        "family_name": family,
+        "email_verified": payload.get("email_verified", False),
+        "payer_id": payload.get("payer_id", payload.get("user_id", payload.get("sub", ""))),
+        "address": {
+            "street_address": address.get("street_address", ""),
+            "locality": address.get("locality", ""),
+            "region": address.get("region", ""),
+            "country": address.get("country", ""),
+            "postal_code": address.get("postal_code", ""),
+        },
     }
