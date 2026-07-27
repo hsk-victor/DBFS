@@ -16,6 +16,9 @@ class Config:
     PAYPAL_BASE = "https://api-m.sandbox.paypal.com"
     PAYPAL_WEB = "https://www.sandbox.paypal.com"
 
+    EODHD_API_KEY = os.getenv("EODHD_API_KEY", "")
+    COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
+    GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
     FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
     TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY", "")
     FMP_API_KEY = os.getenv("FMP_API_KEY", "")
