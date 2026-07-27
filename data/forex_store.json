@@ -1,0 +1,48 @@
+{
+  "quotes": {
+    "FXQ-35EF14DF": {
+      "quote_id": "FXQ-35EF14DF",
+      "currency": "USD",
+      "amount": 100.0,
+      "sgd_rate": 1.35,
+      "sgd_total": 135.0,
+      "service_fee": 0.68,
+      "payable_sgd": 135.68,
+      "rate_date": "2026-07-22",
+      "rate_source": "test",
+      "status": "used",
+      "created_at": 1784725264,
+      "expires_at": 1784725564,
+      "user_id": "demo-user-001"
+    }
+  },
+  "orders": {
+    "ONGX-FX-FAF8AD07": {
+      "order_id": "ONGX-FX-FAF8AD07",
+      "quote_id": "FXQ-35EF14DF",
+      "currency": "USD",
+      "amount": 100.0,
+      "customer_email": "tan.wm@sandbox.paypal.com",
+      "currency_name": "US Dollar",
+      "sgd_rate": 1.35,
+      "sgd_total": 135.0,
+      "service_fee": 0.68,
+      "payable_sgd": 135.68,
+      "rate_source": "test",
+      "rate_date": "2026-07-22",
+      "status": "filled",
+      "created_at": 1784725264,
+      "user_id": "demo-user-001"
+    }
+  },
+  "holdings": {
+    "demo-user-001:USD": {
+      "user_id": "demo-user-001",
+      "currency": "USD",
+      "amount": 100.0,
+      "avg_sgd_rate": 1.35,
+      "updated_at": 1784725264
+    }
+  },
+  "cache": {}
+}
