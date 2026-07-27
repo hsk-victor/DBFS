@@ -236,29 +236,12 @@ class Store:
         return row
 
     def complete_order(self, user_id: str, order_id: str):
-        """Atomically complete a cloud order; guard local demo completion with a lock."""
-        if self._cloud_expected:
-            try:
-                result = self._sb.rpc(
-                    "complete_forex_order",
-                    {"p_user_id": user_id, "p_order_id": order_id},
-                ).execute()
-            except Exception as exc:
-                # Temporary compatibility until the reviewed RPC migration is
-                # applied. This protects one Flask process only; the RPC remains
-                # the production-grade cross-process transaction boundary.
-                if getattr(exc, "code", None) == "PGRST202" or "PGRST202" in str(exc):
-                    log.warning("Forex completion RPC is not installed; using single-process lock")
-                    return self._complete_order_locked(user_id, order_id)
-                log.error("Forex Supabase order completion failed: %s", type(exc).__name__)
-                raise PersistenceError("Forex database order completion failed") from exc
-            if not result.data:
-                return self.find_order(user_id, order_id)
-            return result.data[0] if isinstance(result.data, list) else result.data
+        """Complete once under a process lock; the order is marked filled last.
 
-        return self._complete_order_locked(user_id, order_id)
-
-    def _complete_order_locked(self, user_id: str, order_id: str):
+        This intentionally provides single-process protection for the assignment
+        demo. The filled-status check prevents callback replays from crediting a
+        holding again.
+        """
         with self._lock:
             order = self.find_order(user_id, order_id)
             if not order or order.get("status") not in ("pending_paypal", "filled"):
