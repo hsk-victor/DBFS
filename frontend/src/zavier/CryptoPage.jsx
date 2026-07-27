@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Canvas, loadView } from "@/victor/stocks/components/canvas/Canvas";
+import { Canvas, loadView } from "@/zavier/crypto/components/canvas/Canvas";
 import { CryptoCard } from "@/zavier/crypto/components/CryptoCard";
 import { CryptoBuyDialog } from "@/zavier/crypto/components/CryptoBuyDialog";
 import { CryptoPortfolioCard } from "@/zavier/crypto/components/CryptoPortfolioCard";

@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { CardFrame } from "@/victor/stocks/components/canvas/CardFrame";
 import { Candles } from "@/victor/stocks/components/charts/Candles";
-import { Sparkline } from "@/victor/stocks/components/charts/Sparkline";
 import { Button } from "@/shared/components/ui/button";
 import { api } from "@/shared/lib/api";
 import { fmtPct, fmtSgd, fmtUsd, SENT_BG, SENT_FG, timeAgo } from "@/shared/lib/format";
 const TABS = [
     { id: "ai", label: "AI" },
     { id: "news", label: "News" },
-    { id: "chart", label: "Chart" },
     { id: "fund", label: "Data" },
 ];
 const RANGES = [
@@ -24,7 +22,7 @@ function SentBadge({ tag, small }) {
 }
 export function StockCard({ card, name, quote, fxRate, zoom, loading, onFront, onPatch, onRemove, onBuy, }) {
     const sym = card.sym;
-    const tab = card.tab ?? "ai";
+    const tab = TABS.some((item) => item.id === card.tab) ? card.tab : "ai";
     const range = card.range ?? "1M";
     const [news, setNews] = useState(null);
     const [candles, setCandles] = useState({});
@@ -42,29 +40,20 @@ export function StockCard({ card, name, quote, fxRate, zoom, loading, onFront, o
         if ((tab === "ai" || tab === "news") && !ai && !aiErr) {
             api.get(`/api/ai/analysis/${sym}`).then(setAi).catch(() => setAiErr(true));
         }
-        if (tab === "chart") {
-            const key = range === "custom" ? `custom:${card.from}:${card.to}` : range;
-            if (!candles[key]) {
-                const qs = range === "custom"
-                    ? `?range=custom&from=${card.from ?? "2026-06-12"}&to=${card.to ?? "2026-07-12"}`
-                    : `?range=${range}`;
-                api.get(`/api/market/candles/${sym}${qs}`)
-                    .then((r) => setCandles((prev) => ({ ...prev, [key]: r.candles })))
-                    .catch(() => setCandles((prev) => ({ ...prev, [key]: [] })));
-            }
-        }
-    }, [tab, range, card.from, card.to, sym, news, fund, ai, aiErr, candles]);
-    // Sparkline uses the 1M closes; fetch once on mount
-    useEffect(() => {
-        if (!candles["1M"]) {
-            api.get(`/api/market/candles/${sym}?range=1M`)
-                .then((r) => setCandles((prev) => ({ ...prev, "1M": r.candles })))
-                .catch(() => { });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sym]);
-    const up = (quote?.change_pct ?? 0) >= 0;
+    }, [tab, sym, news, fund, ai, aiErr]);
     const chartKey = range === "custom" ? `custom:${card.from}:${card.to}` : range;
+    // The detailed candlestick chart now lives in the card header.
+    useEffect(() => {
+        if (Object.prototype.hasOwnProperty.call(candles, chartKey))
+            return;
+        const qs = range === "custom"
+            ? `?range=custom&from=${card.from ?? "2026-06-12"}&to=${card.to ?? "2026-07-12"}`
+            : `?range=${range}`;
+        api.get(`/api/market/candles/${sym}${qs}`)
+            .then((response) => setCandles((previous) => ({ ...previous, [chartKey]: response.candles })))
+            .catch(() => setCandles((previous) => ({ ...previous, [chartKey]: [] })));
+    }, [sym, range, card.from, card.to, chartKey, candles]);
+    const up = (quote?.change_pct ?? 0) >= 0;
     const targetPct = fund?.target && quote ? Math.min(100, Math.round((quote.price / fund.target) * 100)) : null;
     const header = (<>
       <div className="flex items-center gap-2.5 pr-14">
@@ -92,7 +81,29 @@ export function StockCard({ card, name, quote, fxRate, zoom, loading, onFront, o
           <div className="mt-[3px] font-mono text-[11.5px] text-zinc-400">
             ≈ {fmtUsd(quote.price)} USD{quote.source !== "live" ? " · cached" : ""}
           </div>
-          <Sparkline candles={candles["1M"] ?? []} up={up} fxRate={fxRate}/>
+          <div className="mt-2.5" data-nodrag="1">
+            <div className="mb-1.5 flex items-center gap-1">
+              {RANGES.map((item) => (<button key={item.id} onClick={() => onPatch({ range: item.id })} className="cursor-pointer rounded-full px-2 py-[3px] font-mono text-[10.5px] hover:bg-zinc-100" style={{
+                  background: range === item.id ? "#f4f4f5" : "transparent",
+                  color: range === item.id ? "#18181b" : "#a1a1aa",
+                  fontWeight: range === item.id ? 600 : 400,
+              }}>
+                  {item.label}
+                </button>))}
+              <span className="flex-1"/>
+              <span className="font-mono text-[10px] text-zinc-400">Twelve Data</span>
+            </div>
+            {range === "custom" && (<div className="mb-1.5 flex items-center gap-1.5">
+                <input type="date" value={card.from ?? "2026-06-12"} onChange={(event) => onPatch({ from: event.target.value })} className="min-w-0 flex-1 rounded-[7px] border border-zinc-200 bg-white px-[7px] py-1 font-mono text-[10.5px] text-zinc-700"/>
+                <span className="text-[11px] text-zinc-400">→</span>
+                <input type="date" value={card.to ?? "2026-07-12"} onChange={(event) => onPatch({ to: event.target.value })} className="min-w-0 flex-1 rounded-[7px] border border-zinc-200 bg-white px-[7px] py-1 font-mono text-[10.5px] text-zinc-700"/>
+              </div>)}
+            <div className="flex h-[90px]">
+              {Object.prototype.hasOwnProperty.call(candles, chartKey)
+                  ? <Candles candles={candles[chartKey]} fxRate={fxRate}/>
+                  : <div className="anim-pulse flex-1 rounded bg-zinc-100"/>}
+            </div>
+          </div>
         </>)}
     </>);
     return (<CardFrame card={card} zoom={zoom} onFront={onFront} onPatch={onPatch} onRemove={onRemove} header={header}>
@@ -140,26 +151,6 @@ export function StockCard({ card, name, quote, fxRate, zoom, loading, onFront, o
                     </span>
                   </span>
                 </a>))))}
-
-          {tab === "chart" && (<div className="flex h-full min-h-24 flex-col">
-              <div className="mb-2 flex shrink-0 gap-1">
-                {RANGES.map((r) => (<button key={r.id} onClick={() => onPatch({ range: r.id })} className="cursor-pointer rounded-full px-2 py-[3px] font-mono text-[10.5px] hover:bg-zinc-100" style={{
-                    background: range === r.id ? "#f4f4f5" : "transparent",
-                    color: range === r.id ? "#18181b" : "#a1a1aa",
-                    fontWeight: range === r.id ? 600 : 400,
-                }}>
-                    {r.label}
-                  </button>))}
-                <span className="flex-1"/>
-                <span className="font-mono text-[10.5px] text-zinc-400">Twelve Data</span>
-              </div>
-              {range === "custom" && (<div className="mb-2 flex shrink-0 items-center gap-1.5">
-                  <input type="date" value={card.from ?? "2026-06-12"} onChange={(e) => onPatch({ from: e.target.value })} className="min-w-0 flex-1 rounded-[7px] border border-zinc-200 bg-white px-[7px] py-1 font-mono text-[10.5px] text-zinc-700"/>
-                  <span className="text-[11px] text-zinc-400">→</span>
-                  <input type="date" value={card.to ?? "2026-07-12"} onChange={(e) => onPatch({ to: e.target.value })} className="min-w-0 flex-1 rounded-[7px] border border-zinc-200 bg-white px-[7px] py-1 font-mono text-[10.5px] text-zinc-700"/>
-                </div>)}
-              {candles[chartKey] ? (<Candles candles={candles[chartKey]} fxRate={fxRate}/>) : (<div className="anim-pulse min-h-[70px] flex-1 rounded bg-zinc-100"/>)}
-            </div>)}
 
           {tab === "fund" && (fund ? (<>
                 <div className="grid grid-cols-2 gap-2">

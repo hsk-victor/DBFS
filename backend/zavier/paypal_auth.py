@@ -1,4 +1,4 @@
-"""Shared Log in with PayPal (OpenID Connect) integration."""
+"""Zavier's Log in with PayPal (OpenID Connect) integration."""
 from urllib.parse import urlencode
 
 import requests
@@ -19,7 +19,7 @@ def authorize_url(state: str) -> str:
             "openid profile email address "
             "https://uri.paypal.com/services/paypalattributes"
         ),
-        "redirect_uri": Config.PAYPAL_REDIRECT_URI,
+        "redirect_uri": Config.ZAVIER_PAYPAL_REDIRECT_URI,
         "state": state,
     })
     return f"{Config.PAYPAL_WEB}/signin/authorize?{query}"
@@ -32,7 +32,7 @@ def exchange_code(code: str) -> str:
         data={
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": Config.PAYPAL_REDIRECT_URI,
+            "redirect_uri": Config.ZAVIER_PAYPAL_REDIRECT_URI,
         },
         timeout=15,
     )
@@ -52,8 +52,10 @@ def userinfo(user_access_token: str) -> dict:
     address = payload.get("address") or {}
     given = str(payload.get("given_name") or "").strip()
     family = str(payload.get("family_name") or "").strip()
-    full_name = str(payload.get("name") or "").strip() or " ".join(x for x in [given, family] if x).strip()
-
+    full_name = (
+        str(payload.get("name") or "").strip()
+        or " ".join(value for value in (given, family) if value).strip()
+    )
     return {
         "user_id": payload.get("user_id", payload.get("sub", "")),
         "name": full_name,

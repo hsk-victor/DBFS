@@ -10,6 +10,7 @@ __pycache__/
 venv/
 data/local_store.json
 data/forex_store.json
+data/zavier_cache.json
 
 # node
 node_modules/

@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from ..demo_data import DEMO_STOCKS
 from ..services import finnhub, fmp, frankfurter, twelvedata
 from ..services.store import store
-from ...shared.auth import require_user
+from ..auth import require_user
 
 market_bp = Blueprint("market", __name__)
 

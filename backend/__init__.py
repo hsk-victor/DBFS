@@ -14,11 +14,9 @@ def create_app() -> Flask:
     CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"], supports_credentials=True)
 
     from .ong_xuan import register_blueprints as register_ong_xuan
-    from .shared import register_blueprints as register_shared
     from .victor import register_blueprints as register_victor
     from .zavier import register_blueprints as register_zavier
 
-    register_shared(app)
     register_victor(app)
     register_zavier(app)
     register_ong_xuan(app)

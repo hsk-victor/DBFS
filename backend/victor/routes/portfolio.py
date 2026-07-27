@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request
 
 from ..services import finnhub, frankfurter
 from ..services.store import store
-from ...shared.auth import require_user
+from ..auth import require_user
 from .market import SYMBOLS
 
 portfolio_bp = Blueprint("portfolio", __name__)

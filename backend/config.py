@@ -13,6 +13,18 @@ class Config:
     PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "")
     PAYPAL_MERCHANT_EMAIL = os.getenv("PAYPAL_MERCHANT_EMAIL", "")
     PAYPAL_REDIRECT_URI = os.getenv("PAYPAL_REDIRECT_URI", "http://127.0.0.1:5000/api/auth/callback")
+    VICTOR_PAYPAL_REDIRECT_URI = os.getenv(
+        "VICTOR_PAYPAL_REDIRECT_URI",
+        PAYPAL_REDIRECT_URI,
+    )
+    ZAVIER_PAYPAL_REDIRECT_URI = os.getenv(
+        "ZAVIER_PAYPAL_REDIRECT_URI",
+        "http://127.0.0.1:5000/api/zavier/auth/callback",
+    )
+    ONG_XUAN_PAYPAL_REDIRECT_URI = os.getenv(
+        "ONG_XUAN_PAYPAL_REDIRECT_URI",
+        "http://127.0.0.1:5000/api/ong-xuan/auth/callback",
+    )
     PAYPAL_BASE = "https://api-m.sandbox.paypal.com"
     PAYPAL_WEB = "https://www.sandbox.paypal.com"
 

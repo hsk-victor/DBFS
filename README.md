@@ -1,29 +1,33 @@
 # Straits Digital
 
-Group application for DBFS Assignment 2. It uses one React frontend and one
-Flask backend, with each member's feature kept in a named folder.
+One React frontend and one Flask backend containing three independently owned
+DBFS features.
 
-## Ownership
+## Repository layout
 
-- **Shared:** `frontend/src/shared`, `backend/shared`
-  - Navigation, login UI, API client, reusable UI, PayPal login and Supabase connection
-- **Victor:** `frontend/src/victor/stocks`, `backend/victor`
-  - Stocks, portfolio, AI, orders and Stocks PayPal checkout
+- **Victor:** `frontend/src/victor`, `backend/victor`
+  - Stocks, portfolio, AI, Stocks auth and PayPal checkout.
 - **Zavier:** `frontend/src/zavier`, `backend/zavier`
-  - Crypto page and `/api/crypto`
+  - Crypto canvas, market data, Crypto auth, orders and PayPal services.
 - **Ong Xuan:** `frontend/src/ong_xuan`, `backend/ong_xuan`
-  - Other page and `/api/other` until the feature name is confirmed
+  - Forex rates, quotes, Forex auth, orders and PayPal checkout.
+- **Shared frontend:** entrypoint/router, global CSS, UI primitives, API client
+  and formatting/navigation helpers.
+- **Shared backend:** Flask configuration and the Supabase connection only.
+
+Each member owns their login screen, navigation bar, profile menu, auth session,
+feature UI and backend logic. The root app only switches between sections.
 
 ## Run locally
 
-Copy `.env.example` to `.env`, fill in your own credentials, then start Flask:
+Copy `.env.example` to `.env`, fill in your credentials and start Flask:
 
 ```powershell
 python -m pip install -r requirements.txt
 python run.py
 ```
 
-Start React in another terminal:
+In another terminal:
 
 ```powershell
 cd frontend
@@ -31,48 +35,24 @@ npm install
 npm run dev
 ```
 
-Open <http://127.0.0.1:5173>. Vite forwards `/api` requests to Flask at
-<http://127.0.0.1:5000>.
+Open <http://127.0.0.1:5173>. Use `127.0.0.1` consistently for PayPal callback
+URLs.
 
-## Current repository setup
+## Integration notes
 
-- The shared navigation already switches between Stocks, Crypto and Other.
-- Crypto and Other currently open as blank pages.
-- Zavier and Ong Xuan's Flask modules and health routes are already registered.
-- PayPal login and the user session are shared across all pages.
-- Each feature keeps its own checkout logic inside its member backend folder.
-- All modules use the same Supabase project through `backend/shared/database.py`.
-- Each member uses their own `.env` when presenting.
-
-## Implementing your frontend
-
-- Start from `CryptoPage.jsx` or `OtherPage.jsx` in your member folder.
-- Add your own `components`, `hooks` or `lib` folders when the page grows.
-- Reuse controls from `@/shared/components/ui` to keep the design consistent.
-- Call Flask through the shared client:
-
-```jsx
-import { api } from "@/shared/lib/api";
-
-const data = await api.get("/api/crypto/example");
-await api.post("/api/crypto/example", { value });
-```
-
-
-## PayPal and Supabase
-
-- PayPal **login** is shared in `backend/shared/paypal_auth.py`.
-- PayPal **checkout** is individual. Victor's example is in
-  `backend/victor/services/paypal.py` and `backend/victor/routes/orders.py`.
-- Zavier and Ong Xuan can create their own checkout services and callback routes
-  inside their folders.
-- The shared Supabase client is available with:
-
-```python
-from backend.shared.database import supabase
-```
-
-- User data should be queried using the authenticated `user["user_id"]`.
-- New tables should use clear feature names such as `crypto_watchlist`.
-- New database changes go into a new timestamped file under
-  `supabase/migrations`.
+- Section URLs are `?section=Stocks`, `?section=Crypto` and `?section=Forex`.
+- Auth endpoints are `/api/victor/auth`, `/api/zavier/auth` and
+  `/api/ong-xuan/auth`. `/api/auth` remains a Stocks compatibility alias.
+- Logging out of one section does not log out the other sections.
+- Existing feature APIs remain `/api/market`, `/api/ai`, `/api/orders`,
+  `/api/portfolio`, `/api/crypto` and `/api/ong-xuan/forex`.
+- Reuse `@/shared/components/ui` and `@/shared/lib/api` for consistent design
+  and Flask requests. Do not import another member's feature files.
+- All modules use the same Supabase project through
+  `backend/shared/database.py`; each feature continues using its own tables.
+- `api_cache` is intentionally shared. Keep cache keys provider/feature
+  prefixed.
+- PayPal checkout code remains inside each member's backend folder. Register
+  the matching member callback from `.env.example` in your PayPal Sandbox app.
+- Secrets stay in the root `.env` because the combined backend is one process;
+  each presenter uses their own local values.

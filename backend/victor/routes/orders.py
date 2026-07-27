@@ -12,7 +12,7 @@ import requests
 from flask import Blueprint, jsonify, redirect, request
 
 from ...config import Config
-from ...shared.auth import require_user
+from ..auth import require_user
 from ..services import finnhub, frankfurter, paypal
 from ..services.store import store
 from .market import _check_sym

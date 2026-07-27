@@ -212,7 +212,7 @@ export function ForexPage() {
 
         try {
             const [profile, fxRates, rateCompare, rateHistory, orderList, holdingList] = await Promise.all([
-                api.get("/api/auth/me"),
+                api.get("/api/ong-xuan/auth/me"),
                 api.get("/api/ong-xuan/forex/rates"),
                 api.get("/api/ong-xuan/forex/rate-comparison").catch(() => null),
                 api.get("/api/ong-xuan/forex/history").catch(() => null),
@@ -243,7 +243,10 @@ export function ForexPage() {
                 orderId: params.get("forex_order_id") || "",
             });
 
-            window.history.replaceState({}, "", window.location.pathname);
+            const next = new URL(window.location.href);
+            next.searchParams.delete("forex_status");
+            next.searchParams.delete("forex_order_id");
+            window.history.replaceState({}, "", next.pathname + next.search);
         }
 
         loadData();

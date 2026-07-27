@@ -1,5 +1,4 @@
-"""PayPal login. Real 'Log in with PayPal' when keys are configured,
-plus a demo login so the app runs with zero setup."""
+"""Ong Xuan's independent Forex authentication session."""
 import secrets
 
 from flask import Blueprint, jsonify, redirect, request, session
@@ -7,41 +6,43 @@ from flask import Blueprint, jsonify, redirect, request, session
 from ..config import Config
 from . import paypal_auth as paypal
 
-auth_bp = Blueprint("auth", __name__)
+auth_bp = Blueprint("ong_xuan_auth", __name__)
+USER_KEY = "ong_xuan_user"
+STATE_KEY = "ong_xuan_oauth_state"
 
 
 def current_user():
-    return session.get("user")
+    return session.get(USER_KEY)
 
 
 def require_user():
-    u = current_user()
-    if not u:
+    user = current_user()
+    if not user:
         return None, (jsonify({"error": "not authenticated"}), 401)
-    return u, None
+    return user, None
 
 
 @auth_bp.get("/login")
 def login():
     if not paypal.configured():
-        return jsonify({"error": "PayPal not configured — use /api/auth/demo"}), 503
+        return jsonify({"error": "PayPal not configured - use the Forex demo login"}), 503
     state = secrets.token_urlsafe(16)
-    session["oauth_state"] = state
+    session[STATE_KEY] = state
     return redirect(paypal.authorize_url(state))
 
 
 @auth_bp.get("/callback")
 def callback():
-    if request.args.get("state") != session.pop("oauth_state", None):
+    if request.args.get("state") != session.pop(STATE_KEY, None):
         return jsonify({"error": "state mismatch"}), 400
     code = request.args.get("code")
     if not code:
-        return redirect(Config.FRONTEND_URL + "?login=cancelled")
+        return redirect(f"{Config.FRONTEND_URL}?section=Forex&login=cancelled")
     token = paypal.exchange_code(code)
     user = paypal.userinfo(token)
     user["demo"] = False
-    session["user"] = user
-    return redirect(Config.FRONTEND_URL)
+    session[USER_KEY] = user
+    return redirect(f"{Config.FRONTEND_URL}?section=Forex")
 
 
 @auth_bp.post("/demo")
@@ -64,19 +65,20 @@ def demo_login():
         },
         "demo": True,
     }
-    session["user"] = user
+    session[USER_KEY] = user
     return jsonify(user)
 
 
 @auth_bp.get("/me")
 def me():
-    u = current_user()
-    if not u:
+    user = current_user()
+    if not user:
         return jsonify({"authenticated": False, "paypal_configured": paypal.configured()})
-    return jsonify({"authenticated": True, "paypal_configured": paypal.configured(), "user": u})
+    return jsonify({"authenticated": True, "paypal_configured": paypal.configured(), "user": user})
 
 
 @auth_bp.post("/logout")
 def logout():
-    session.clear()
+    session.pop(USER_KEY, None)
+    session.pop(STATE_KEY, None)
     return jsonify({"ok": True})

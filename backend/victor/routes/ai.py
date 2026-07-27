@@ -2,7 +2,7 @@
 from flask import Blueprint, jsonify
 
 from ..services import finnhub, fmp, llm
-from ...shared.auth import require_user
+from ..auth import require_user
 from .market import _check_sym
 
 ai_bp = Blueprint("ai", __name__)

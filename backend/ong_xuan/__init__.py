@@ -9,7 +9,7 @@ import requests
 from flask import Blueprint, jsonify, redirect, request
 
 from ..config import Config
-from ..shared.auth import require_user
+from .auth import require_user
 from .services import paypal
 from .services.store import PersistenceError, store
 
@@ -346,4 +346,7 @@ def paypal_cancel():
 
 
 def register_blueprints(app):
+    from .auth import auth_bp
+
+    app.register_blueprint(auth_bp, url_prefix="/api/ong-xuan/auth")
     app.register_blueprint(forex_bp, url_prefix="/api/ong-xuan/forex")

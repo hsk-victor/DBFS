@@ -5,8 +5,8 @@ import time
 
 from flask import Blueprint, jsonify, redirect, request
 
+from .auth import require_user
 from ..config import Config
-from ..shared.auth import require_user
 from ..shared.database import supabase
 from .services.GNews import search_symbol_strict
 from .services.coingecko import COINS as COINGECKO_COINS, fundamentals_all
@@ -473,4 +473,7 @@ def news():
 
 
 def register_blueprints(app):
+    from .auth import auth_bp
+
+    app.register_blueprint(auth_bp, url_prefix="/api/zavier/auth")
     app.register_blueprint(crypto_bp, url_prefix="/api/crypto")

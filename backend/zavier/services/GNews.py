@@ -5,7 +5,7 @@ import re
 import requests
 
 from ...config import Config
-from ...victor.services.http import get_json
+from .http import get_json
 
 BASE = "https://gnews.io/api/v4"
 

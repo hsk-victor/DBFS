@@ -1,7 +1,7 @@
 """CoinGecko crypto helpers split by URI purpose."""
 
 from ...config import Config
-from ...victor.services.http import cached_fetch, get_json
+from .http import cached_fetch, get_json
 
 BASE = "https://api.coingecko.com/api/v3"
 
