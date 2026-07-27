@@ -1,4 +1,4 @@
-import { CardFrame } from "@/victor/stocks/components/canvas/CardFrame";
+import { CardFrame } from "@/zavier/crypto/components/canvas/CardFrame";
 import { fmtPct, fmtQty, fmtSgd, fmtUsd } from "@/shared/lib/format";
 
 export function CryptoPortfolioCard({ card, holdings, fxRate, zoom, loading, onFront, onPatch, onRemove }) {

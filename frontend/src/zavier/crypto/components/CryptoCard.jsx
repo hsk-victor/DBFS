@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { CardFrame } from "@/victor/stocks/components/canvas/CardFrame";
-import { Sparkline } from "@/victor/stocks/components/charts/Sparkline";
+import { CardFrame } from "@/zavier/crypto/components/canvas/CardFrame";
+import { Sparkline } from "@/zavier/crypto/components/charts/Sparkline";
 import { Button } from "@/shared/components/ui/button";
 import { fmtPct, fmtSgd, fmtUsd } from "@/shared/lib/format";
 import { CryptoChartPanel } from "@/zavier/crypto/components/CryptoChartPanel";

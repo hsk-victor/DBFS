@@ -1,4 +1,4 @@
-import { Candles } from "@/victor/stocks/components/charts/Candles";
+import { Candles } from "@/zavier/crypto/components/charts/Candles";
 
 export function CryptoChartPanel({ candles, loading, fxRate }) {
     if (loading && !candles.length)
