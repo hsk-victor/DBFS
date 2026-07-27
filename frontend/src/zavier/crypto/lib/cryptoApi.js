@@ -22,10 +22,6 @@ export const cryptoApi = {
         const qs = buildSymbolsQuery(symbols);
         return api.get(`/api/crypto/fundamentals${qs ? `?${qs}` : ""}`);
     },
-    chart: (symbols) => {
-        const qs = buildSymbolsQuery(symbols);
-        return api.get(`/api/crypto/chart${qs ? `?${qs}` : ""}`);
-    },
     news: (symbol) => api.get(`/api/crypto/news?symbol=${symbol}`),
     fx: () => api.get("/api/crypto/fx"),
     holdings: () => api.get("/api/crypto/holdings"),

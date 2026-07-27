@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cryptoApi } from "@/zavier/crypto/lib/cryptoApi";
-import { mapCandles, mapSpark } from "@/zavier/crypto/lib/cryptoFormat";
+import { mapCandles } from "@/zavier/crypto/lib/cryptoFormat";
 
 export function useCryptoDetails(symbol, coin, activeTab) {
     const [tab, setTab] = useState("overview");
@@ -9,7 +9,6 @@ export function useCryptoDetails(symbol, coin, activeTab) {
     const [loadedSymbol, setLoadedSymbol] = useState(null);
     const [eod, setEod] = useState(null);
     const [fund, setFund] = useState(null);
-    const [chart, setChart] = useState(null);
     const [news, setNews] = useState(null);
     const [newsError, setNewsError] = useState("");
     const [error, setError] = useState("");
@@ -52,35 +51,6 @@ export function useCryptoDetails(symbol, coin, activeTab) {
             alive = false;
         };
     }, [symbol, loadedSymbol]);
-
-    useEffect(() => {
-        if (!symbol || chart !== null)
-            return;
-        let alive = true;
-        setLoading(true);
-        console.info("[crypto/details] request start", { symbol, endpoint: "/api/crypto/chart", force: false });
-        cryptoApi.chart([symbol])
-            .then((res) => {
-                if (!alive)
-                    return;
-                const next = (res.items ?? [])[0] ?? null;
-                setChart(next);
-                console.info("[crypto/details] chart settled", { symbol, status: "fulfilled", chartPoints: next?.points?.length ?? 0 });
-            })
-            .catch((e) => {
-                if (!alive)
-                    return;
-                setChart(null);
-                console.info("[crypto/details] chart settled", { symbol, status: "rejected", chartError: e instanceof Error ? e.message : String(e) });
-            })
-            .finally(() => {
-                if (alive)
-                    setLoading(false);
-            });
-        return () => {
-            alive = false;
-        };
-    }, [symbol, chart]);
 
     useEffect(() => {
         if (!symbol || currentTab !== "overview" || fund !== null)
@@ -174,7 +144,7 @@ export function useCryptoDetails(symbol, coin, activeTab) {
 
     const eodCandles = useMemo(() => mapCandles(eod?.points), [eod]);
     const candles = eodCandles;
-    const spark = useMemo(() => mapSpark(chart?.points), [chart]);
+    const spark = useMemo(() => [], []);
 
     const metrics = useMemo(() => {
         if (!fund)
@@ -198,7 +168,6 @@ export function useCryptoDetails(symbol, coin, activeTab) {
         fund,
         news,
         newsError,
-        chart,
         candles,
         spark,
         metrics,

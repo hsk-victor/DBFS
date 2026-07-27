@@ -9,7 +9,7 @@ from ..config import Config
 from ..shared.auth import require_user
 from ..shared.database import supabase
 from .services.GNews import search_symbol_strict
-from .services.coingecko import COINS as COINGECKO_COINS, fundamentals_all, market_chart_all
+from .services.coingecko import COINS as COINGECKO_COINS, fundamentals_all
 from .services.eodhd import eod_series_all, realtime_prices, usd_sgd
 from .services.paypal import capture_order, create_order, create_payout, get_payout_batch, userinfo_strict
 
@@ -457,14 +457,6 @@ def fundamentals():
     force = str(request.args.get("force", "false")).lower() in {"1", "true", "yes", "on"}
     symbols = _parse_symbols_arg()
     payload = fundamentals_all(force=force, symbols=symbols)
-    return jsonify({"symbols": symbols, "items": payload})
-
-
-@crypto_bp.get("/chart")
-def chart():
-    force = str(request.args.get("force", "false")).lower() in {"1", "true", "yes", "on"}
-    symbols = _parse_symbols_arg()
-    payload = market_chart_all(force=force, symbols=symbols)
     return jsonify({"symbols": symbols, "items": payload})
 
 
