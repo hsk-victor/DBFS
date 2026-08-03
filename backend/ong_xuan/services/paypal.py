@@ -63,8 +63,34 @@ def create_order(sgd_amount: str, description: str, return_url: str, cancel_url:
 def capture_order(order_id: str) -> dict:
     response = requests.post(
         f"{Config.PAYPAL_BASE}/v2/checkout/orders/{order_id}/capture",
-        headers={"Authorization": f"Bearer {app_token()}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {app_token()}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
+        },
         timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def get_order(order_id: str) -> dict:
+    """Return PayPal's current representation of a checkout order."""
+    response = requests.get(
+        f"{Config.PAYPAL_BASE}/v2/checkout/orders/{order_id}",
+        headers={"Authorization": f"Bearer {app_token()}"},
+        timeout=15,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def get_capture(capture_id: str) -> dict:
+    """Return final settlement details for a captured payment."""
+    response = requests.get(
+        f"{Config.PAYPAL_BASE}/v2/payments/captures/{capture_id}",
+        headers={"Authorization": f"Bearer {app_token()}"},
+        timeout=15,
     )
     response.raise_for_status()
     return response.json()

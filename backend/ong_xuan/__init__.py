@@ -1,4 +1,5 @@
 """Ong Xuan's persistent, quote-bound Forex feature."""
+import logging
 import secrets
 import time
 from datetime import date, timedelta
@@ -14,6 +15,7 @@ from .services import paypal
 from .services.store import PersistenceError, store
 
 forex_bp = Blueprint("ong_xuan_forex", __name__)
+log = logging.getLogger(__name__)
 
 SUPPORTED = {
     "USD": {"name": "US Dollar", "flag": "🇺🇸", "fallback": Decimal("1.3500")},
@@ -23,6 +25,7 @@ SUPPORTED = {
 RATES_KEY = "forex:rates:SGD"
 COMPARISON_KEY = "forex:comparison:SGD"
 HISTORY_KEY = "forex:history:ALL:7d"
+CURRENCIES_KEY = "forex:currencies:v2"
 
 
 def _money(value):
@@ -151,6 +154,54 @@ def get_rate_history():
         return store.cache_get_stale(HISTORY_KEY) or {"source": "No history available", "history": []}
 
 
+def _live_currency_info():
+    """Return metadata for the three currencies offered by StraitsFX."""
+    response = requests.get("https://api.frankfurter.dev/v2/currencies", timeout=12)
+    response.raise_for_status()
+    data = response.json()
+
+    def find_currency(code):
+        if isinstance(data, list):
+            return next((item for item in data
+                         if str(item.get("iso_code") or item.get("code") or "").upper() == code), {})
+        if isinstance(data, dict):
+            value = data.get(code, {})
+            return value if isinstance(value, dict) else {"name": value}
+        return {}
+
+    currencies = []
+    for code in ("USD", "EUR", "GBP"):
+        item = find_currency(code)
+        currencies.append({
+            "code": code,
+            "name": item.get("name") or SUPPORTED[code]["name"],
+            "symbol": item.get("symbol") or "",
+            "providers": item.get("providers") or [],
+        })
+    return {"source": "Frankfurter v2 currencies", "currencies": currencies, "demo": False}
+
+
+def get_currency_info():
+    cached = store.cache_get(CURRENCIES_KEY, 86400)
+    if cached:
+        return cached
+    try:
+        payload = _live_currency_info()
+        store.cache_put(CURRENCIES_KEY, payload)
+        return payload
+    except Exception:
+        stale = store.cache_get_stale(CURRENCIES_KEY)
+        if stale:
+            return stale
+        return {
+            "source": "Static currency metadata",
+            "currencies": [{"code": code, "name": SUPPORTED[code]["name"],
+                            "symbol": "", "providers": []}
+                           for code in ("USD", "EUR", "GBP")],
+            "demo": True,
+        }
+
+
 def _format_rates(payload):
     return {
         "date": payload.get("date", ""), "source": payload["source"],
@@ -178,6 +229,43 @@ def _complete_order(user_id, order):
     if latest.get("status") != "pending_paypal":
         return None
     return store.complete_order(user_id, latest["order_id"])
+
+
+def _amount_matches(amount, payable_sgd):
+    if not isinstance(amount, dict) or amount.get("currency_code") != "SGD":
+        return False
+    try:
+        return _money(amount.get("value")) == _money(payable_sgd)
+    except (InvalidOperation, ValueError, TypeError):
+        return False
+
+
+def _capture_record(payload):
+    for unit in payload.get("purchase_units", []):
+        captures = (unit.get("payments") or {}).get("captures") or []
+        if captures:
+            return captures[0]
+    return None
+
+
+def _verified_completed_capture(order, payload):
+    capture = _capture_record(payload)
+    if not capture or capture.get("status") != "COMPLETED":
+        return False
+    if not _amount_matches(capture.get("amount"), order["payable_sgd"]):
+        return False
+    capture_id = capture.get("id")
+    if not capture_id:
+        return False
+    try:
+        details = paypal.get_capture(capture_id)
+    except requests.RequestException:
+        # Funds have already moved. Complete from the capture response rather
+        # than leave a paid order without its Forex holding.
+        log.warning("PayPal capture detail lookup failed after completed capture")
+        return True
+    return (details.get("status") == "COMPLETED"
+            and _amount_matches(details.get("amount"), order["payable_sgd"]))
 
 
 @forex_bp.errorhandler(PersistenceError)
@@ -208,6 +296,11 @@ def rate_comparison():
 @forex_bp.get("/history")
 def rate_history():
     return jsonify(get_rate_history())
+
+
+@forex_bp.get("/currency-info")
+def currency_info():
+    return jsonify(get_currency_info())
 
 
 @forex_bp.post("/quote")
@@ -325,8 +418,27 @@ def paypal_return():
     if order.get("status") != "pending_paypal":
         return _frontend_redirect("error", order_id)
     try:
+        paypal_order = paypal.get_order(order_id)
+        purchase_units = paypal_order.get("purchase_units") or []
+        paypal_amount = purchase_units[0].get("amount") if purchase_units else None
+        if not _amount_matches(paypal_amount, order["payable_sgd"]):
+            store.update_order(user["user_id"], order_id, {"status": "failed"})
+            return _frontend_redirect("error", order_id)
+
+        # A callback retry can arrive after PayPal completed but before the
+        # database fill. Verify that capture instead of capturing twice.
+        if paypal_order.get("status") == "COMPLETED":
+            if (_verified_completed_capture(order, paypal_order)
+                    and _complete_order(user["user_id"], order)):
+                return _frontend_redirect("filled", order_id)
+            return _frontend_redirect("error", order_id)
+        if paypal_order.get("status") != "APPROVED":
+            return _frontend_redirect("error", order_id)
+
         captured = paypal.capture_order(order_id)
-        if captured.get("status") == "COMPLETED" and _complete_order(user["user_id"], order):
+        if (captured.get("status") == "COMPLETED"
+                and _verified_completed_capture(order, captured)
+                and _complete_order(user["user_id"], order)):
             return _frontend_redirect("filled", order_id)
     except requests.RequestException:
         pass

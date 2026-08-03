@@ -190,6 +190,7 @@ export function ForexPage() {
     const [rates, setRates] = useState(null);
     const [comparison, setComparison] = useState(null);
     const [history, setHistory] = useState(null);
+    const [currencyInfo, setCurrencyInfo] = useState(null);
     const [currency, setCurrency] = useState("USD");
     const [amount, setAmount] = useState("100");
     const [quote, setQuote] = useState(null);
@@ -206,16 +207,23 @@ export function ForexPage() {
         return rates?.rates?.find((r) => r.code === currency) ?? null;
     }, [rates, currency]);
 
+    const currencyMetadata = useMemo(() => {
+        return Object.fromEntries(
+            (currencyInfo?.currencies ?? []).map((item) => [item.code, item]),
+        );
+    }, [currencyInfo]);
+
     async function loadData() {
         setLoading(true);
         setError("");
 
         try {
-            const [profile, fxRates, rateCompare, rateHistory, orderList, holdingList] = await Promise.all([
+            const [profile, fxRates, rateCompare, rateHistory, currencyCatalogue, orderList, holdingList] = await Promise.all([
                 api.get("/api/ong-xuan/auth/me"),
                 api.get("/api/ong-xuan/forex/rates"),
                 api.get("/api/ong-xuan/forex/rate-comparison").catch(() => null),
                 api.get("/api/ong-xuan/forex/history").catch(() => null),
+                api.get("/api/ong-xuan/forex/currency-info").catch(() => null),
                 api.get("/api/ong-xuan/forex/orders").catch(() => []),
                 api.get("/api/ong-xuan/forex/holdings").catch(() => []),
             ]);
@@ -224,6 +232,7 @@ export function ForexPage() {
             setRates(fxRates);
             setComparison(rateCompare);
             setHistory(rateHistory);
+            setCurrencyInfo(currencyCatalogue);
             setOrders(orderList);
             setHoldings(holdingList);
         } catch (err) {
@@ -402,6 +411,13 @@ export function ForexPage() {
                                         {r.pair}
                                     </div>
 
+                                    <div className="mt-1 text-[11px] text-zinc-400">
+                                        {currencyMetadata[r.code]?.name ?? r.name ?? r.code}
+                                        {currencyMetadata[r.code]?.symbol
+                                            ? ` · ${currencyMetadata[r.code].symbol}`
+                                            : ""}
+                                    </div>
+
                                     <div className="mt-2 text-2xl font-semibold text-zinc-950">
                                         {num(r.sgd_per_unit || 0)}
                                     </div>
@@ -415,6 +431,10 @@ export function ForexPage() {
                                     </div>
                                 </button>
                             ))}
+                        </div>
+
+                        <div className="mt-3 text-[11px] text-zinc-400">
+                            Currency metadata: {currencyInfo?.source ?? "Loading Frankfurter catalogue…"}
                         </div>
 
                         <form
