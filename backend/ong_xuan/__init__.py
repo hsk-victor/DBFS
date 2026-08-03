@@ -56,6 +56,7 @@ def _fallback_rates():
 
 
 def _live_rates():
+    # URI #1: GET /v1/latest - current SGD exchange rates.
     response = requests.get(
         "https://api.frankfurter.dev/v1/latest",
         params={"base": "SGD", "symbols": "USD,EUR,GBP"}, timeout=12,
@@ -83,6 +84,7 @@ def get_rates():
 
 def _live_comparison():
     primary = get_rates()
+    # URI #2: GET /v6/latest/SGD - independent rate comparison.
     response = requests.get("https://open.er-api.com/v6/latest/SGD", timeout=12)
     response.raise_for_status()
     data = response.json()
@@ -127,6 +129,7 @@ def get_comparison():
 def _live_history():
     end = date.today()
     start = end - timedelta(days=7)
+    # URI #3: GET /v1/{start}..{end} - seven-day Forex history.
     response = requests.get(
         f"https://api.frankfurter.dev/v1/{start}..{end}",
         params={"base": "SGD", "symbols": "USD,EUR,GBP"}, timeout=12,
@@ -156,6 +159,7 @@ def get_rate_history():
 
 def _live_currency_info():
     """Return metadata for the three currencies offered by StraitsFX."""
+    # URI #6: GET /v2/currencies - currency names and symbols.
     response = requests.get("https://api.frankfurter.dev/v2/currencies", timeout=12)
     response.raise_for_status()
     data = response.json()
